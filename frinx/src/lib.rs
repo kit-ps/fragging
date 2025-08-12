@@ -1,7 +1,7 @@
 //! Prototype implementation of Frinx, the mix format with fragmentation.
 use std::io::Write;
 
-use aez::Aez;
+use zears::Aez;
 use curve25519_dalek::{
     EdwardsPoint, Scalar, constants::ED25519_BASEPOINT_TABLE, edwards::CompressedEdwardsY,
 };
@@ -212,17 +212,13 @@ fn h_pi(a: &EdwardsPoint) -> [u8; KAPPA] {
 
 fn pi(key: [u8; KAPPA], data: &[u8]) -> Vec<u8> {
     let aez = Aez::new(&key);
-    let mut ct = vec![0u8; data.len()];
-    aez.encrypt(AEZ_NONCE, None, data, &mut ct);
-    ct
+    aez.encrypt(AEZ_NONCE, &[], 0, data)
 }
 
 fn pi_inv(key: [u8; KAPPA], data: &[u8]) -> Vec<u8> {
     let aez = Aez::new(&key);
-    let mut pt = vec![0u8; data.len()];
-    // Should never return Err(...)
-    aez.decrypt(AEZ_NONCE, None, data, &mut pt).unwrap();
-    pt
+    // Should never return None
+    aez.decrypt(AEZ_NONCE, &[], 0, data).unwrap()
 }
 
 #[derive(Debug, Clone)]
