@@ -1,3 +1,4 @@
+//! Prototype implementation of Frinx, the mix format with fragmentation.
 use std::io::Write;
 
 use aez::Aez;
@@ -32,11 +33,13 @@ pub enum Error {
     InvalidHeaderFlag,
     #[error("fragment set is incomplete")]
     MissingFragments,
+    #[error("the paths don't end at the same node")]
+    DivergingPaths,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Node {
     pub address: Address,
     pub public_key: EdwardsPoint,
@@ -241,12 +244,20 @@ impl Frinx {
         if fragments.len() != paths.len() {
             return Err(Error::InvalidPathCount);
         }
+        if fragments.is_empty() {
+            return Ok(Vec::new());
+        }
         if fragments[0].len() + 3 * KAPPA != self.payload_size as usize {
             return Err(Error::InvalidFragmentSize);
         }
         for fragment in &fragments[1..] {
             if fragment.len() != self.payload_size as usize {
                 return Err(Error::InvalidFragmentSize);
+            }
+        }
+        for path in &paths[1..] {
+            if path.as_ref().last() != paths[0].as_ref().last() {
+                return Err(Error::DivergingPaths);
             }
         }
 
