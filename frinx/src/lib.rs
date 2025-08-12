@@ -53,6 +53,12 @@ impl Node {
             public_key,
         }
     }
+
+    pub fn random<R: Rng>(mut rng: R) -> (Scalar, Node) {
+        let private_key = Scalar::from_bytes_mod_order_wide(&rng.random());
+        let address = rng.random();
+        (private_key, Self::from_private_key(address, &private_key))
+    }
 }
 
 #[derive(Debug, Clone)]
