@@ -92,7 +92,9 @@ fn bench_unwrap(c: &mut Criterion) {
     let message = vec![13u8, 16];
     for &payload_size in PAYLOAD_SIZES {
         let builder = SphinxPacketBuilder::default().with_payload_size(payload_size);
-        let packet = builder.build_packet(message.clone(), &route, &destination, &delays).unwrap();
+        let packet = builder
+            .build_packet(message.clone(), &route, &destination, &delays)
+            .unwrap();
 
         let node1_sk = &nodes[0].0;
 
