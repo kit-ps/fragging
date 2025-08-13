@@ -16,14 +16,16 @@ extern crate sphinx_packet;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use sphinx_packet::constants::{
-    DESTINATION_ADDRESS_LENGTH, IDENTIFIER_LENGTH, NODE_ADDRESS_LENGTH, MAX_PATH_LENGTH,
+    DESTINATION_ADDRESS_LENGTH, IDENTIFIER_LENGTH, MAX_PATH_LENGTH, NODE_ADDRESS_LENGTH,
 };
 use sphinx_packet::crypto::keygen;
 use sphinx_packet::header::delays;
 use sphinx_packet::route::{Destination, DestinationAddressBytes, Node, NodeAddressBytes};
-use sphinx_packet::SphinxPacket;
+use sphinx_packet::{SphinxPacket, SphinxPacketBuilder};
 use std::convert::TryInto;
 use std::time::Duration;
+
+const PAYLOAD_SIZES: &[usize] = &[128, 256, 512, 1024];
 
 fn make_packet_copy(packet: &SphinxPacket) -> SphinxPacket {
     SphinxPacket::from_bytes(&packet.to_bytes()).unwrap()
@@ -49,27 +51,34 @@ fn bench_new_no_surb(c: &mut Criterion) {
 
     let message = vec![13u8, 16];
 
-    c.bench_function("sphinx creation", |b| {
-        b.iter(|| {
-            SphinxPacket::new(
-                black_box(message.clone()),
-                black_box(&nodes),
-                black_box(&destination),
-                black_box(&delays),
-            )
-            .unwrap()
-        })
-    });
+    for &payload_size in PAYLOAD_SIZES {
+        let builder = SphinxPacketBuilder::default().with_payload_size(payload_size);
+        c.bench_function(&format!("sphinx creation ({payload_size})"), |b| {
+            b.iter(|| {
+                builder
+                    .build_packet(
+                        black_box(message.clone()),
+                        black_box(&nodes),
+                        black_box(&destination),
+                        black_box(&delays),
+                    )
+                    .unwrap()
+            })
+        });
+    }
 }
 
 fn bench_unwrap(c: &mut Criterion) {
     let nodes = (0..MAX_PATH_LENGTH)
         .map(|i| {
             let (sk, pk) = keygen();
-            (sk, Node::new(
-                NodeAddressBytes::from_bytes([i.try_into().unwrap(); NODE_ADDRESS_LENGTH]),
-                pk,
-            ))
+            (
+                sk,
+                Node::new(
+                    NodeAddressBytes::from_bytes([i.try_into().unwrap(); NODE_ADDRESS_LENGTH]),
+                    pk,
+                ),
+            )
         })
         .collect::<Vec<_>>();
 
@@ -81,19 +90,22 @@ fn bench_unwrap(c: &mut Criterion) {
     );
 
     let message = vec![13u8, 16];
-    let packet = SphinxPacket::new(message, &route, &destination, &delays).unwrap();
+    for &payload_size in PAYLOAD_SIZES {
+        let builder = SphinxPacketBuilder::default().with_payload_size(payload_size);
+        let packet = builder.build_packet(message.clone(), &route, &destination, &delays).unwrap();
 
-    let node1_sk = &nodes[0].0;
+        let node1_sk = &nodes[0].0;
 
-    // technically it's not benching only unwrapping, but also "make_packet_copy"
-    // but it's relatively small
-    c.bench_function("sphinx unwrap", |b| {
-        b.iter(|| {
-            make_packet_copy(&packet)
-                .process(black_box(node1_sk))
-                .unwrap()
-        })
-    });
+        // technically it's not benching only unwrapping, but also "make_packet_copy"
+        // but it's relatively small
+        c.bench_function(&format!("sphinx unwrap ({payload_size})"), |b| {
+            b.iter(|| {
+                make_packet_copy(&packet)
+                    .process(black_box(node1_sk))
+                    .unwrap()
+            })
+        });
+    }
 }
 
 criterion_group!(sphinx, bench_new_no_surb, bench_unwrap);
