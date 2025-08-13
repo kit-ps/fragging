@@ -21,7 +21,7 @@ use sphinx_packet::constants::{
 use sphinx_packet::crypto::keygen;
 use sphinx_packet::header::delays;
 use sphinx_packet::route::{Destination, DestinationAddressBytes, Node, NodeAddressBytes};
-use sphinx_packet::{SphinxPacket, SphinxPacketBuilder};
+use sphinx_packet::{SURBMaterial, SphinxPacket, SphinxPacketBuilder};
 use std::convert::TryInto;
 use std::time::Duration;
 
@@ -110,6 +110,30 @@ fn bench_unwrap(c: &mut Criterion) {
     }
 }
 
-criterion_group!(sphinx, bench_new_no_surb, bench_unwrap);
+fn bench_surb(c: &mut Criterion) {
+    let nodes = (0..MAX_PATH_LENGTH)
+        .map(|i| {
+            let (_, pk) = keygen();
+            Node::new(
+                NodeAddressBytes::from_bytes([i.try_into().unwrap(); NODE_ADDRESS_LENGTH]),
+                pk,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let delays = delays::generate_from_average_duration(nodes.len(), Duration::from_millis(10));
+    let destination = Destination::new(
+        DestinationAddressBytes::from_bytes([3u8; DESTINATION_ADDRESS_LENGTH]),
+        [4u8; IDENTIFIER_LENGTH],
+    );
+
+    let material = SURBMaterial::new(nodes, delays, destination);
+
+    c.bench_function("sphinx surb", |b| {
+        b.iter(|| material.clone().construct_SURB().unwrap())
+    });
+}
+
+criterion_group!(sphinx, bench_new_no_surb, bench_unwrap, bench_surb);
 
 criterion_main!(sphinx);

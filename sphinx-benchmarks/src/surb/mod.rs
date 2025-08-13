@@ -34,6 +34,7 @@ impl fmt::Debug for SURB {
     }
 }
 
+#[derive(Clone)]
 pub struct SURBMaterial {
     surb_route: Vec<Node>,
     surb_delays: Vec<Delay>,
