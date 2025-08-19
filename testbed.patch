@@ -1,0 +1,1698 @@
+diff --git a/.dockerignore b/.dockerignore
+index 09ed12913..64274581b 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -2,6 +2,6 @@
+ .github
+ .gitignore
+ **/node_modules
+-**/target
++#**/target
+ dist
+ documentation
+diff --git a/.gitignore b/.gitignore
+index 597794c0e..b6be256b5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,6 +1,8 @@
+ // Copyright 2020 - Nym Technologies SA <contact@nymtech.net>
+ // SPDX-License-Identifier: CC0-1.0
+-
++/shadow/shadow.log
++/shadow/shadow.data
++/shadow/keys/*
+ /targetString
+ **/*.rs.bk
+ /*/target
+@@ -51,4 +53,4 @@ ppa-private-key.b64
+ ppa-private-key.asc
+ nym-network-monitor/topology.json
+ nym-network-monitor/__pycache__
+-nym-network-monitor/*.key
+\ No newline at end of file
++nym-network-monitor/*.key
+diff --git a/Cargo.lock b/Cargo.lock
+index 135ecf513..d82cd5d74 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3618,9 +3618,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "lazy_static"
+-version = "1.4.0"
++version = "1.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
++checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+ 
+ [[package]]
+ name = "ledger-apdu"
+@@ -4801,10 +4801,13 @@ dependencies = [
+ name = "nym-config"
+ version = "0.1.0"
+ dependencies = [
++ "bs58",
+  "dirs 5.0.1",
+  "handlebars",
++ "lazy_static",
+  "log",
+  "nym-network-defaults",
++ "project-root",
+  "serde",
+  "toml 0.8.14",
+  "url",
+@@ -5145,6 +5148,7 @@ dependencies = [
+  "nym-network-requester",
+  "nym-node-http-api",
+  "nym-pemstore",
++ "nym-sdk",
+  "nym-sphinx",
+  "nym-task",
+  "nym-types",
+@@ -5650,6 +5654,7 @@ dependencies = [
+  "clap 4.5.17",
+  "colored",
+  "cupid",
++ "dirs 5.0.1",
+  "humantime-serde",
+  "ipnetwork 0.20.0",
+  "nym-authenticator",
+@@ -5860,6 +5865,7 @@ dependencies = [
+  "nym-bandwidth-controller",
+  "nym-bin-common",
+  "nym-client-core",
++ "nym-config",
+  "nym-credential-storage",
+  "nym-credential-utils",
+  "nym-credentials",
+@@ -5868,6 +5874,7 @@ dependencies = [
+  "nym-gateway-requests",
+  "nym-network-defaults",
+  "nym-ordered-buffer",
++ "nym-pemstore",
+  "nym-service-providers-common",
+  "nym-socks5-client-core",
+  "nym-socks5-requests",
+@@ -7133,6 +7140,12 @@ dependencies = [
+  "yansi",
+ ]
+ 
++[[package]]
++name = "project-root"
++version = "0.2.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "8bccbff07d5ed689c4087d20d7307a52ab6141edeedf487c3876a55b86cf63df"
++
+ [[package]]
+ name = "prometheus"
+ version = "0.13.4"
+diff --git a/README.md b/README.md
+index 8ebd3b590..8795ee35d 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,61 @@
++# Nym Testing Environment
++This is a fork of the original [Nym Project](https://github.com/nymtech/nym) intended for testing vulnerabilities against a custom Nym network. We are using the [Shadow Network Simulator](https://shadow.github.io/) to simulate our network. We assume that you have installed Shadow and added it to your path.
++To install Nym, clone this and follow the steps in the original README below to build.
++To run the simulation, run the following commands:
++```
++cd shadow
++```
++Initialize the node configuration. This only needs to be run once.
++```
++sh init.sh 
++```
++Run the Shadow simulation.
++```
++sh runshadow.sh
++```
++This may take a few minutes.
++## Fragment Delays
++For this attack to work, the victim's gateway must drop the victim's *outgoing* packets at random. This way, the victim will
++retransmit fragments that did not receive an ACK after a certain timeframe. This will cause delays on the recipient's end.
++In order to determine which fragment set was sent by the victim, we must set a threshold for the delay. If the fragment
++set's delay is higher than the threshold, it was sent by the victim. This way, we can account for unexpected delays of other,
++unrelated packets that could cause false detections.
++The fragment set delay is defined as the time between the arrival of the first and the last fragment of a set.
++In our simulation, Alice is the victim and Bob is the attacker.
++
++After running the simulation, run the following command to interpret the results:
++```
++python timestamps.py 3
++```
++The output shows the delays of each fragment set the attacker received, including ones from normal clients not belonging
++to the victim. The detection of the victim's fragment set depends on the threshold, which is passed as an argument at the end.
++You may change the threshold to your liking. For our purposes, a threshold of 3 seconds seems to be optimal.
++
++If you wish to run multiple tests at once, run the following command:
++```
++sh runtests.sh
++```
++The tests may take several minutes to complete. The results will be written to  ```shadow/tests/testlog```.
++Please note that this will reset previously generated client keys.
++
++## Navigating Shadow
++In order to read the output of the simulation, you may run
++```cd shadow.data/hosts/``` and then ```ls```. This will list all the actors (*hosts*) in our simulation. The ```validator.nymtech.net```
++host is a dummy for the Nym-API and serves no other purpose.
++Each host has its own directory containing the standard and error output, which you can view with the text editor of your choice,
++or by using the ```cat``` command.
++
++## Troubleshooting
++If issues arise, it's worth trying the following:
++- Clearing the client_keys directory and running ```sh init.sh``` again
++- Clearing the ```~/.nym``` directory in your home directory and running ```sh init.sh```(**WARNING:** this also contains Nym data unrelated to this project)
++- Increasing the simulation duration in the ```shadow/shadow.yaml``` configuration file and running the simulation again
++
++If none of these work, or you simply wish to take a look under the hood, you can look through the outputs of the simulation
++as described above.
++
++Below is the original README of the Nym project.
++
+ <!--
+ Copyright 2020 - Nym Technologies SA <contact@nymtech.net>
+ SPDX-License-Identifier: Apache-2.0
+diff --git a/common/client-core/src/client/base_client/mod.rs b/common/client-core/src/client/base_client/mod.rs
+index 646300d5a..de3f16175 100644
+--- a/common/client-core/src/client/base_client/mod.rs
++++ b/common/client-core/src/client/base_client/mod.rs
+@@ -52,7 +52,7 @@ use nym_sphinx::receiver::{ReconstructedMessage, SphinxMessageReceiver};
+ use nym_task::connections::{ConnectionCommandReceiver, ConnectionCommandSender, LaneQueueLengths};
+ use nym_task::{TaskClient, TaskHandle};
+ use nym_topology::provider_trait::TopologyProvider;
+-use nym_topology::HardcodedTopologyProvider;
++use nym_topology::{HardcodedTopologyProvider, NymTopology};
+ use nym_validator_client::{nyxd::contract_traits::DkgQueryClient, UserAgent};
+ use rand::rngs::OsRng;
+ use std::fmt::Debug;
+@@ -536,7 +536,8 @@ where
+         // before returning, block entire runtime to refresh the current network view so that any
+         // components depending on topology would see a non-empty view
+         info!("Obtaining initial network topology");
+-        topology_refresher.try_refresh().await;
++        // We don't need this
++        /* topology_refresher.try_refresh().await;
+ 
+         if let Err(err) = topology_refresher.ensure_topology_is_routable().await {
+             log::error!(
+@@ -582,6 +583,7 @@ where
+             info!("Starting topology refresher...");
+             topology_refresher.start_with_shutdown(shutdown);
+         }
++         */
+ 
+         Ok(())
+     }
+@@ -690,7 +692,10 @@ where
+         // channels responsible for controlling ack messages
+         let (ack_sender, ack_receiver) = mpsc::unbounded();
+         let shared_topology_accessor = TopologyAccessor::new();
+-
++        //Added this since we removed the refresher
++        shared_topology_accessor
++            .update_global_topology(Some(NymTopology::new()))
++            .await;
+         // Shutdown notifier for signalling tasks to stop
+         let shutdown = self
+             .shutdown
+@@ -721,6 +726,8 @@ where
+         );
+ 
+         // needs to be started as the first thing to block if required waiting for the gateway
++        // - not for us -
++        /*
+         Self::start_topology_refresher(
+             topology_provider,
+             self.config.debug.topology,
+@@ -729,7 +736,7 @@ where
+             self.wait_for_gateway,
+             shutdown.fork("topology_refresher"),
+         )
+-        .await?;
++        .await?;*/
+ 
+         let packet_stats_reporter =
+             Self::start_packet_statistics_control(shutdown.fork("packet_statistics_control"));
+diff --git a/common/client-core/src/client/topology_control/mod.rs b/common/client-core/src/client/topology_control/mod.rs
+index bbf32f377..25a468f41 100644
+--- a/common/client-core/src/client/topology_control/mod.rs
++++ b/common/client-core/src/client/topology_control/mod.rs
+@@ -1,13 +1,14 @@
+ // Copyright 2021-2023 - Nym Technologies SA <contact@nymtech.net>
+ // SPDX-License-Identifier: Apache-2.0
+ 
++use std::collections::BTreeMap;
+ use crate::spawn_future;
+ pub(crate) use accessor::{TopologyAccessor, TopologyReadPermit};
+ use futures::StreamExt;
+ use log::*;
+ use nym_sphinx::addressing::nodes::NodeIdentity;
+ use nym_topology::provider_trait::TopologyProvider;
+-use nym_topology::NymTopologyError;
++use nym_topology::{NymTopology, NymTopologyError};
+ use std::time::Duration;
+ 
+ #[cfg(not(target_arch = "wasm32"))]
+@@ -69,7 +70,9 @@ impl TopologyRefresher {
+                 .await;
+         }
+ 
+-        let new_topology = self.topology_provider.get_new_topology().await;
++        //let new_topology = self.topology_provider.get_new_topology().await;
++        // We want to use our own topology instead of getting it from somewhere else.
++        let new_topology = Some(NymTopology::new());
+         if new_topology.is_none() {
+             warn!("failed to obtain new network topology");
+         }
+diff --git a/common/client-core/src/init/helpers.rs b/common/client-core/src/init/helpers.rs
+index c6d17fc16..6ef340198 100644
+--- a/common/client-core/src/init/helpers.rs
++++ b/common/client-core/src/init/helpers.rs
+@@ -312,7 +312,6 @@ pub(super) async fn register_with_gateway(
+ ) -> Result<RegistrationResult, ClientCoreError> {
+     let mut gateway_client =
+         GatewayClient::new_init(gateway_listener, gateway_id, our_identity.clone());
+-
+     gateway_client.establish_connection().await.map_err(|err| {
+         log::warn!("Failed to establish connection with gateway!");
+         ClientCoreError::GatewayClientError {
+diff --git a/common/client-libs/gateway-client/src/client/mod.rs b/common/client-libs/gateway-client/src/client/mod.rs
+index 2278c6fa4..cfda5ccc3 100644
+--- a/common/client-libs/gateway-client/src/client/mod.rs
++++ b/common/client-libs/gateway-client/src/client/mod.rs
+@@ -183,6 +183,8 @@ impl<C, St> GatewayClient<C, St> {
+             "Attemting to establish connection to gateway at: {}",
+             self.gateway_address
+         );
++        println!("establishing connection to '{}'", self.gateway_address);
++
+         let ws_stream = match connect_async(&self.gateway_address).await {
+             Ok((ws_stream, _)) => ws_stream,
+             Err(error) => {
+diff --git a/common/config/Cargo.toml b/common/config/Cargo.toml
+index 0723f2c38..8141244bb 100644
+--- a/common/config/Cargo.toml
++++ b/common/config/Cargo.toml
+@@ -14,8 +14,11 @@ log = { workspace = true }
+ serde = { workspace = true, features = ["derive"] }
+ toml = { workspace = true }
+ url = { workspace = true }
++project-root = "0.2.2"
+ 
+ nym-network-defaults = { path = "../network-defaults", features = ["utoipa"] }
++bs58 = "0.5.1"
++lazy_static = "1.5.0"
+ 
+ [features]
+ default = ["dirs"]
+diff --git a/common/config/src/environment.rs b/common/config/src/environment.rs
+new file mode 100644
+index 000000000..93204cda5
+--- /dev/null
++++ b/common/config/src/environment.rs
+@@ -0,0 +1,50 @@
++use std::fs;
++use std::env;
++use std::collections::HashMap;
++use lazy_static::lazy_static;
++use bs58;
++
++// Not intended for inserting anywhere else => no lock.
++lazy_static! {
++    static ref NODE_KEYS: (HashMap<u32, String>, HashMap<u32, String>) = {
++        let mut node_pubkeys = HashMap::new();
++        let mut node_sphinxkeys = HashMap::new();
++        // Configure which nodes you wanna use here... Their pubkeys will be loaded from ~/.nym/nym-nodes/*id*/keys, so make sure the nodes are initialized!
++        let mix_ids : Vec<u32> = vec![4,5,6,10,11];
++        for id in mix_ids {
++            let (pubkey, sphinx) = get_keys_from_file(id);
++            node_pubkeys.insert(id, pubkey);
++            node_sphinxkeys.insert(id, sphinx);
++        }
++        (node_pubkeys, node_sphinxkeys)
++    };
++    static ref PROJECT_ROOT: String = project_root::get_project_root().unwrap().to_str().unwrap()
++    .to_string();
++}
++fn get_keys_from_file(mix_id: u32) -> (String, String) {
++    let id_as_string = mix_id.to_string();
++    // Getting home directory
++    let home = dirs::home_dir().expect("Failed to retrieve home directory").to_string_lossy().to_string();
++    // Get the info from the path split with newline
++    let content = fs::read_to_string(format!("{}/.nym/nym-nodes/{}/keys", home, &id_as_string))
++        .expect("Unable to read file");
++
++    let data = content.split('\n').collect::<Vec<&str>>();
++
++
++    (data[0].to_string(), data[1].to_string())
++}
++
++pub fn get_keys_from_id(mix_id: u32) -> (String, String) {
++    let (pubkey, sphinxkey) = NODE_KEYS.clone();
++    (pubkey.get(&mix_id).unwrap().to_string(), sphinxkey.get(&mix_id).unwrap().to_string())
++}
++pub fn get_pubkey_hashmap() -> HashMap<u32, String> {
++    NODE_KEYS.0.clone()
++}
++pub fn get_sphinxkey_hashmap() -> HashMap<u32, String> {
++    NODE_KEYS.1.clone()
++}
++pub fn get_project_dir() -> String {
++    PROJECT_ROOT.clone()
++}
+diff --git a/common/config/src/lib.rs b/common/config/src/lib.rs
+index 932d7515a..112c8b879 100644
+--- a/common/config/src/lib.rs
++++ b/common/config/src/lib.rs
+@@ -16,6 +16,7 @@ pub mod defaults;
+ pub mod helpers;
+ pub mod legacy_helpers;
+ pub mod serde_helpers;
++pub mod environment;
+ 
+ pub const NYM_DIR: &str = ".nym";
+ pub const DEFAULT_NYM_APIS_DIR: &str = "nym-api";
+diff --git a/common/mixnode-common/src/verloc/mod.rs b/common/mixnode-common/src/verloc/mod.rs
+index 68004105d..b840800cf 100644
+--- a/common/mixnode-common/src/verloc/mod.rs
++++ b/common/mixnode-common/src/verloc/mod.rs
+@@ -308,7 +308,8 @@ impl VerlocMeasurer {
+ 
+     pub async fn run(&mut self) {
+         self.start_listening();
+-
++        // We don't need verloc for our test environment right now. This was causing problems.
++        /*
+         while !self.shutdown_listener.is_shutdown() {
+             info!("Starting verloc measurements");
+             // TODO: should we also measure gateways?
+@@ -383,6 +384,7 @@ impl VerlocMeasurer {
+         }
+ 
+         log::trace!("Verloc: Exiting");
++         */
+     }
+ }
+ 
+diff --git a/common/nymsphinx/chunking/src/reconstruction.rs b/common/nymsphinx/chunking/src/reconstruction.rs
+index 13383b24e..45996e6f1 100644
+--- a/common/nymsphinx/chunking/src/reconstruction.rs
++++ b/common/nymsphinx/chunking/src/reconstruction.rs
+@@ -4,7 +4,7 @@ use crate::fragment::Fragment;
+ use crate::{fragment_received, ChunkingError};
+ use log::*;
+ use std::collections::HashMap;
+-
++use std::time::{Duration, SystemTime};
+ // TODO: perhaps a more sophisticated approach with writing to disk periodically in case
+ // we're receiving fast & furious in uncompressed 4K - we don't want to keep that in memory;
+ // perhaps write whole sets to the disk if there are still more of them to recover?
+@@ -110,6 +110,11 @@ impl ReconstructionBuffer {
+             }
+         });
+ 
++        println!("Inserting fragment-set:{}-cur:{}-timestamp:{}-set_size:{}",
++                 fragment.id(), fragment.current_fragment(), 
++                 SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
++                fragment.total_fragments()
++        );
+         fragment_received(&fragment);
+ 
+         let fragment_index = fragment.current_fragment() as usize - 1;
+diff --git a/common/nymsphinx/src/receiver.rs b/common/nymsphinx/src/receiver.rs
+index ac1857fd8..632971df3 100644
+--- a/common/nymsphinx/src/receiver.rs
++++ b/common/nymsphinx/src/receiver.rs
+@@ -292,6 +292,8 @@ mod message_receiver {
+         );
+ 
+         NymTopology::new(
++            // We removed all arguments from this function because we only want our nodes
++            /*
+             // currently coco_nodes don't really exist so this is still to be determined
+             mixes,
+             vec![gateway::Node {
+@@ -309,7 +311,7 @@ mod message_receiver {
+                 )
+                 .unwrap(),
+                 version: "0.8.0-dev".into(),
+-            }],
++            }],*/
+         )
+     }
+ }
+diff --git a/common/topology/src/lib.rs b/common/topology/src/lib.rs
+index 5630122d0..4b7704716 100644
+--- a/common/topology/src/lib.rs
++++ b/common/topology/src/lib.rs
+@@ -8,6 +8,7 @@ use crate::filter::VersionFilterable;
+ pub use error::NymTopologyError;
+ use log::{debug, info, warn};
+ use mix::Node;
++use mix::Layer;
+ use nym_config::defaults::var_names::NYM_API;
+ use nym_mixnet_contract_common::mixnode::MixNodeDetails;
+ use nym_mixnet_contract_common::{GatewayBond, IdentityKeyRef, MixId};
+@@ -26,6 +27,7 @@ use std::str::FromStr;
+ #[cfg(feature = "serializable")]
+ use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
+ use nym_api_requests::models::DescribedGateway;
++use nym_config::environment;
+ 
+ pub mod error;
+ pub mod filter;
+@@ -127,7 +129,7 @@ pub struct NymTopology {
+ impl NymTopology {
+     pub async fn new_from_env() -> Result<Self, NymTopologyError> {
+         let api_url = std::env::var(NYM_API)?;
+-
++        return Ok(NymTopology::new());
+         info!("Generating topology from {}", api_url);
+ 
+         let mixnodes = reqwest::get(&format!("{}/v1/mixnodes", api_url))
+@@ -148,11 +150,97 @@ impl NymTopology {
+             .map(gateway::Node::try_from)
+             .filter(Result::is_ok)
+             .collect::<Result<Vec<_>, _>>()?;
+-        let topology = NymTopology::new_unordered(mixnodes, gateways);
++        let topology = NymTopology::new();
+         Ok(topology)
+     }
+ 
+-    pub fn new(mixes: BTreeMap<MixLayer, Vec<mix::Node>>, gateways: Vec<gateway::Node>) -> Self {
++    pub fn new() -> Self {
++        // Here we put our custom nodes. We only use *this* method for creating the topology :)
++        let mut mixes = BTreeMap::new();
++        let pubkeys = environment::get_pubkey_hashmap();
++        let sphinxkeys = environment::get_sphinxkey_hashmap();
++        mixes.insert(
++            1,
++            vec![mix::Node {
++                mix_id: 4,
++                owner: None,
++                host: "178.79.143.64".parse().unwrap(),
++                mix_host: "178.79.143.64:1789".parse().unwrap(),
++                identity_key: pubkeys.get(&4).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                sphinx_key: sphinxkeys.get(&4).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                layer: Layer::One,
++                version: "1.1.0".into(),
++            }],
++        );
++        mixes.insert(
++            2,
++            vec![mix::Node {
++                mix_id: 5,
++                owner: None,
++                host: "178.79.143.65".parse().unwrap(),
++                mix_host: "178.79.143.65:1789".parse().unwrap(),
++                identity_key: pubkeys.get(&5).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                sphinx_key: sphinxkeys.get(&5).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                layer: Layer::Two,
++                version: "1.1.0".into(),
++            }],
++        );
++        mixes.insert(
++            3,
++            vec![mix::Node {
++                mix_id: 6,
++                owner: None,
++                host: "178.79.143.66".parse().unwrap(),
++                mix_host: "178.79.143.66:1789".parse().unwrap(),
++                identity_key: pubkeys.get(&6).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                sphinx_key: sphinxkeys.get(&6).unwrap().to_string()
++                    .parse()
++                    .unwrap(),
++                layer: Layer::Three,
++                version: "1.1.0".into(),
++            }],
++        );
++        let mut gateways = Vec::new();
++        gateways.push(gateway::Node {
++            owner: None,
++            host: "139.162.247.97".parse().unwrap(),
++            mix_host: "139.162.247.97:1789".parse().unwrap(),
++            identity_key: pubkeys.get(&10).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            sphinx_key: sphinxkeys.get(&10).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            clients_ws_port: 9000,
++            clients_wss_port: None,
++            version: "1.1.0".into(),
++        },
++        );
++        gateways.push(gateway::Node {
++            owner: None,
++            host: "139.162.247.98".parse().unwrap(),
++            mix_host: "139.162.247.98:1789".parse().unwrap(),
++            identity_key: pubkeys.get(&11).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            sphinx_key: sphinxkeys.get(&11).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            clients_ws_port: 9000,
++            clients_wss_port: None,
++            version: "1.1.0".into(),
++        },
++        );
+         NymTopology { mixes, gateways }
+     }
+ 
+@@ -176,9 +264,8 @@ impl NymTopology {
+         <G as TryInto<gateway::Node>>::Error: Display,
+         <M as TryInto<mix::Node>>::Error: Display,
+     {
+-        let mut mixes = BTreeMap::new();
+-        let mut gateways = Vec::new();
+ 
++        /*
+         for node in unordered_mixes.into_iter() {
+             match node.try_into() {
+                 Ok(mixnode) => mixes
+@@ -194,9 +281,9 @@ impl NymTopology {
+                 Ok(gateway) => gateways.push(gateway),
+                 Err(err) => debug!("malformed gateway: {err}"),
+             }
+-        }
++        } */
+ 
+-        NymTopology::new(mixes, gateways)
++        NymTopology::new()
+     }
+ 
+     #[cfg(feature = "serializable")]
+@@ -518,7 +605,7 @@ where
+     G: IntoGatewayNode,
+     <G as TryInto<gateway::Node>>::Error: Display,
+ {
+-    let mut mixes = BTreeMap::new();
++    /* let mut mixes = BTreeMap::new();
+     for bond in mix_details
+         .into_iter()
+         .map(|details| details.bond_information)
+@@ -554,9 +641,9 @@ where
+                 continue;
+             }
+         }
+-    }
++    }*/
+ 
+-    NymTopology::new(mixes, gateways)
++    NymTopology::new()
+ }
+ 
+ #[cfg(test)]
+@@ -603,7 +690,7 @@ mod converting_mixes_to_vec {
+             mixes.insert(1, vec![node1, node2]);
+             mixes.insert(2, vec![node3]);
+ 
+-            let topology = NymTopology::new(mixes, vec![]);
++            let topology = NymTopology::new();
+             let mixvec = topology.mixes_as_vec();
+             assert!(mixvec
+                 .iter()
+@@ -617,7 +704,7 @@ mod converting_mixes_to_vec {
+ 
+         #[test]
+         fn returns_an_empty_vec() {
+-            let topology = NymTopology::new(BTreeMap::new(), vec![]);
++            let topology = NymTopology::new();
+             let mixvec = topology.mixes_as_vec();
+             assert!(mixvec.is_empty());
+         }
+diff --git a/common/topology/src/serde.rs b/common/topology/src/serde.rs
+index b68dd470b..155397ae7 100644
+--- a/common/topology/src/serde.rs
++++ b/common/topology/src/serde.rs
+@@ -65,7 +65,7 @@ impl TryFrom<SerializableNymTopology> for NymTopology {
+     type Error = SerializableTopologyError;
+ 
+     fn try_from(value: SerializableNymTopology) -> Result<Self, Self::Error> {
+-        let mut converted_mixes = BTreeMap::new();
++        /*let mut converted_mixes = BTreeMap::new();
+ 
+         for (layer, nodes) in value.mixnodes {
+             let layer_nodes = nodes
+@@ -81,8 +81,9 @@ impl TryFrom<SerializableNymTopology> for NymTopology {
+             .into_iter()
+             .map(TryInto::try_into)
+             .collect::<Result<_, _>>()?;
+-
+-        Ok(NymTopology::new(converted_mixes, gateways))
++        */
++        // We only need our topology.
++        Ok(NymTopology::new())
+     }
+ }
+ 
+diff --git a/gateway/Cargo.toml b/gateway/Cargo.toml
+index cbdcfc1ad..0854bcd89 100644
+--- a/gateway/Cargo.toml
++++ b/gateway/Cargo.toml
+@@ -87,7 +87,7 @@ nym-task = { path = "../common/task" }
+ nym-types = { path = "../common/types" }
+ nym-validator-client = { path = "../common/client-libs/validator-client" }
+ nym-ip-packet-router = { path = "../service-providers/ip-packet-router" }
+-
++nym-sdk = { path = "../sdk/rust/nym-sdk" }
+ nym-wireguard = { path = "../common/wireguard" }
+ nym-wireguard-types = { path = "../common/wireguard-types", default-features = false }
+ 
+diff --git a/gateway/src/node/client_handling/websocket/common_state.rs b/gateway/src/node/client_handling/websocket/common_state.rs
+index 2120b3342..2d96aa5e2 100644
+--- a/gateway/src/node/client_handling/websocket/common_state.rs
++++ b/gateway/src/node/client_handling/websocket/common_state.rs
+@@ -8,7 +8,8 @@ use std::sync::Arc;
+ // I can see this being possible expanded with say storage or client store
+ #[derive(Clone)]
+ pub(crate) struct CommonHandlerState<S> {
+-    pub(crate) ecash_verifier: Arc<EcashManager<S>>,
++    // We don't need ecash stuff
++    //pub(crate) ecash_verifier: Arc<EcashManager<S>>,
+     pub(crate) storage: S,
+     pub(crate) local_identity: Arc<identity::KeyPair>,
+     pub(crate) only_coconut_credentials: bool,
+diff --git a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
+index c15a27302..8d8b50037 100644
+--- a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
++++ b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
+@@ -33,7 +33,7 @@ use thiserror::Error;
+ use tokio::io::{AsyncRead, AsyncWrite};
+ use tokio_tungstenite::tungstenite::{protocol::Message, Error as WsError};
+ use tracing::*;
+-
++use nym_sdk::mixnet::client_util;
+ #[derive(Debug, Error)]
+ pub enum RequestHandlingError {
+     #[error("Internal gateway storage error")]
+@@ -218,6 +218,19 @@ where
+     ///
+     /// * `mix_packet`: packet received from the client that should get forwarded into the network.
+     fn forward_packet(&self, mix_packet: MixPacket) {
++        // Drop OUTGOING packets from our victim, creating a delay at the recipient's end
++        let alice = client_util::recipient_from_client_name("alice_drops", 10);
++        let drop_chance = 0.3;
++        let rng: f32 = random();
++        if self.client.address.as_base58_string() == alice.identity().to_base58_string() {
++            log::debug!("its alice!");
++            if rng < drop_chance {
++                log::debug!("rng: {rng}, dropping packet...");
++                return;
++            } else {
++                log::debug!("rng: {rng}, continuing!");
++            }
++        }
+         if let Err(err) = self.inner.outbound_mix_sender.unbounded_send(mix_packet) {
+             error!("We failed to forward requested mix packet - {err}. Presumably our mix forwarder has crashed. We cannot continue.");
+             process::exit(1);
+@@ -243,17 +256,19 @@ where
+             &self.client.shared_keys,
+             iv,
+         )?;
+-        let mut verifier = CredentialVerifier::new(
++        //Removing ecash verifiers, we don't need them in the test environment.
++        /*let mut verifier = CredentialVerifier::new(
+             credential,
+             self.inner.shared_state.ecash_verifier.clone(),
+             self.bandwidth_storage_manager.clone(),
+-        );
++        );*/
+ 
+-        let available_total = verifier
++        let available_total = 1000; // a random replacement can't hurt
++        /*verifier
+             .verify()
+             .await
+             .inspect_err(|verification_failure| debug!("{verification_failure}"))?;
+-        trace!("available total bandwidth: {available_total}");
++        trace!("available total bandwidth: {available_total}");*/
+ 
+         Ok(ServerResponse::Bandwidth { available_total })
+     }
+diff --git a/gateway/src/node/mod.rs b/gateway/src/node/mod.rs
+index bf5c3f0ab..7e15d2900 100644
+--- a/gateway/src/node/mod.rs
++++ b/gateway/src/node/mod.rs
+@@ -241,7 +241,7 @@ impl<St> Gateway<St> {
+         mixnet_handling::Listener::new(listening_address, shutdown).start(connection_handler);
+     }
+ 
+-    #[cfg(target_os = "linux")]
++/*    #[cfg(target_os = "linux")]
+     async fn start_authenticator(
+         &mut self,
+         forwarding_channel: MixForwardingSender,
+@@ -334,7 +334,7 @@ impl<St> Gateway<St> {
+                 "wireguard not set".to_string(),
+             )))
+         }
+-    }
++    } */
+ 
+     #[cfg(not(target_os = "linux"))]
+     async fn start_authenticator(
+@@ -351,7 +351,6 @@ impl<St> Gateway<St> {
+         forwarding_channel: MixForwardingSender,
+         active_clients_store: ActiveClientsStore,
+         shutdown: TaskClient,
+-        ecash_verifier: Arc<EcashManager<St>>,
+     ) where
+         St: Storage + Send + Sync + Clone + 'static,
+     {
+@@ -363,7 +362,7 @@ impl<St> Gateway<St> {
+         );
+ 
+         let shared_state = websocket::CommonHandlerState {
+-            ecash_verifier,
++            //ecash_verifier,
+             storage: self.storage.clone(),
+             local_identity: Arc::clone(&self.identity_keypair),
+             only_coconut_credentials: self.config.gateway.only_coconut_credentials,
+@@ -549,6 +548,10 @@ impl<St> Gateway<St> {
+     async fn check_if_bonded(&self) -> Result<bool, GatewayError> {
+         // TODO: if anything, this should be getting data directly from the contract
+         // as opposed to the validator API
++
++        // don't check.
++        return Ok(true);
++
+         let validator_client = self.random_api_client()?;
+         let existing_nodes = match validator_client.get_cached_gateways().await {
+             Ok(nodes) => nodes,
+@@ -579,7 +582,8 @@ impl<St> Gateway<St> {
+             .map(Into::<TaskHandle>::into)
+             .unwrap_or_else(|| TaskHandle::Internal(TaskManager::new(10)))
+             .name_if_unnamed("gateway");
+-
++        // We don't want anything from nyx, we don't care about tokens or transactions
++        /*
+         let nyxd_client = self.random_nyxd_client()?;
+ 
+         if self.config.gateway.only_coconut_credentials {
+@@ -599,7 +603,7 @@ impl<St> Gateway<St> {
+                 return Err(GatewayError::InsufficientNodeBalance { account, balance });
+             }
+         }
+-
++        */
+         let handler_config = CredentialHandlerConfig {
+             revocation_bandwidth_penalty: self
+                 .config
+@@ -615,7 +619,7 @@ impl<St> Gateway<St> {
+                 .zk_nym_tickets
+                 .maximum_time_between_redemption,
+         };
+-
++        /*
+         let ecash_verifier = Arc::new(
+             EcashManager::new(
+                 handler_config,
+@@ -625,7 +629,7 @@ impl<St> Gateway<St> {
+                 self.storage.clone(),
+             )
+             .await?,
+-        );
++        ); */
+ 
+         let mix_forwarding_channel = self.start_packet_forwarder(shutdown.fork("PacketForwarder"));
+ 
+@@ -640,7 +644,7 @@ impl<St> Gateway<St> {
+             mix_forwarding_channel.clone(),
+             active_clients_store.clone(),
+             shutdown.fork("websocket::Listener"),
+-            ecash_verifier.clone(),
++            //ecash_verifier.clone(),
+         );
+ 
+         let nr_request_filter = if self.config.network_requester.enabled {
+@@ -669,8 +673,8 @@ impl<St> Gateway<St> {
+         } else {
+             info!("embedded ip packet router is disabled");
+         };
+-
+-        let _wg_api = if self.wireguard_data.is_some() {
++        // Don't need wireguard
++        /* let _wg_api = if self.wireguard_data.is_some() {
+             let embedded_auth = self
+                 .start_authenticator(
+                     mix_forwarding_channel,
+@@ -683,7 +687,7 @@ impl<St> Gateway<St> {
+             Some(embedded_auth.wg_api)
+         } else {
+             None
+-        };
++        }; */
+ 
+         if self.run_http_server {
+             HttpApiBuilder::new(
+diff --git a/mixnode/src/node/mod.rs b/mixnode/src/node/mod.rs
+index 004311365..c2ba0ba43 100644
+--- a/mixnode/src/node/mod.rs
++++ b/mixnode/src/node/mod.rs
+@@ -233,6 +233,8 @@ impl MixNode {
+     async fn check_if_bonded(&self) -> bool {
+         // TODO: if anything, this should be getting data directly from the contract
+         // as opposed to the validator API
++        // We don't care about validators either!
++        return true;
+         let validator_client = self.random_api_client();
+         let existing_nodes = match validator_client.get_cached_mixnodes().await {
+             Ok(nodes) => nodes,
+@@ -282,7 +284,8 @@ impl MixNode {
+             delay_forwarding_channel,
+             shutdown.fork("Listener"),
+         );
+-        let atomic_verloc_results = self.start_verloc_measurements(shutdown.fork("VerlocMeasurer"));
++        // Disabling verloc.
++        /*let atomic_verloc_results = self.start_verloc_measurements(shutdown.fork("VerlocMeasurer"));
+ 
+         // Rocket handles shutdown on it's own, but its shutdown handling should be incorporated
+         // with that of the rest of the tasks.
+@@ -294,7 +297,7 @@ impl MixNode {
+                 self.config.metrics_key(),
+                 shutdown.fork("http-api"),
+             )?;
+-        }
++        }*/
+ 
+         info!("Finished nym mixnode startup procedure - it should now be able to receive mix traffic!");
+         self.wait_for_interrupt(shutdown).await;
+diff --git a/nym-api/src/network_monitor/test_route/mod.rs b/nym-api/src/network_monitor/test_route/mod.rs
+index 477251f80..4a71a3991 100644
+--- a/nym-api/src/network_monitor/test_route/mod.rs
++++ b/nym-api/src/network_monitor/test_route/mod.rs
+@@ -21,17 +21,18 @@ impl TestRoute {
+         l3_mix: mix::Node,
+         gateway: gateway::Node,
+     ) -> Self {
+-        let layered_mixes = [
++        /*let layered_mixes = [
+             (1u8, vec![l1_mix]),
+             (2u8, vec![l2_mix]),
+             (3u8, vec![l3_mix]),
+         ]
+         .into_iter()
+         .collect();
+-
++        */
+         TestRoute {
+             id,
+-            nodes: NymTopology::new(layered_mixes, vec![gateway]),
++            // We changed the function signature...
++            nodes: NymTopology::new(),
+         }
+     }
+ 
+diff --git a/nym-node/Cargo.toml b/nym-node/Cargo.toml
+index 442b62a3b..78f2ad453 100644
+--- a/nym-node/Cargo.toml
++++ b/nym-node/Cargo.toml
+@@ -61,6 +61,7 @@ nym-gateway = { path = "../gateway" }
+ nym-authenticator = { path = "../service-providers/authenticator" }
+ nym-network-requester = { path = "../service-providers/network-requester" }
+ nym-ip-packet-router = { path = "../service-providers/ip-packet-router" }
++dirs = "5.0.1"
+ 
+ [build-dependencies]
+ # temporary bonding information v1 (to grab and parse nym-mixnode and nym-gateway package versions)
+diff --git a/nym-node/src/cli/commands/run/mod.rs b/nym-node/src/cli/commands/run/mod.rs
+index 8135e66f8..2cc796237 100644
+--- a/nym-node/src/cli/commands/run/mod.rs
++++ b/nym-node/src/cli/commands/run/mod.rs
+@@ -6,10 +6,13 @@ use crate::node::NymNode;
+ use nym_config::helpers::SPECIAL_ADDRESSES;
+ use nym_node::config::upgrade_helpers::try_load_current_config;
+ use nym_node::error::NymNodeError;
+-use std::fs;
++use std::{env, fs};
+ use std::net::IpAddr;
+ use tracing::log::warn;
+ use tracing::{debug, info, trace};
++use std::fs::File;
++use std::io::Write;
++
+ 
+ mod args;
+ 
+@@ -84,7 +87,8 @@ pub(crate) async fn execute(mut args: Args) -> Result<(), NymNodeError> {
+         return Err(NymNodeError::NoPublicIps);
+     }
+     check_public_ips(&config.host.public_ips, local)?;
+-
++    // Need id for saving the keys to file later
++    let id = config.clone().id;
+     let nym_node = NymNode::new(config)
+         .await?
+         .with_accepted_operator_terms_and_conditions(accepted_operator_terms_and_conditions);
+@@ -109,7 +113,21 @@ pub(crate) async fn execute(mut args: Args) -> Result<(), NymNodeError> {
+         })?;
+     }
+ 
++    info!("ed25519 identity key: '{}'", nym_node.ed25519_identity_key().to_base58_string());
++    info!("Sphinx key: '{}'", nym_node.x25519_sphinx_key().to_base58_string());
++    info!("id: '{}’", id);
++
++
+     if init_only {
++        let home = dirs::home_dir().expect("Failed to retrieve home directory").to_str().unwrap().to_string();
++        info!("{}/.nym/nym-nodes/{}/keys", home, id.clone());
++
++        // Write the keys to a file on init (in the nym config in the home directory)
++        let _ = File::create(format!("{}/.nym/nym-nodes/{}/keys", home, id.clone())).expect("creation failed");
++        fs::write(format!("{}/.nym/nym-nodes/{}/keys", home, id), nym_node.ed25519_identity_key().to_base58_string() + "\n"
++        + &*nym_node.x25519_sphinx_key().to_base58_string());
++
++
+         debug!("returning due to the 'init-only' flag");
+         return Ok(());
+     }
+diff --git a/sdk/rust/nym-sdk/Cargo.toml b/sdk/rust/nym-sdk/Cargo.toml
+index 8ed4845e9..f67140bf6 100644
+--- a/sdk/rust/nym-sdk/Cargo.toml
++++ b/sdk/rust/nym-sdk/Cargo.toml
+@@ -14,6 +14,7 @@ nym-client-core = { path = "../../../common/client-core", features = [
+     "fs-surb-storage",
+     "fs-gateways-storage",
+ ] }
++nym-config = { path = "../../../common/config/" }
+ nym-crypto = { path = "../../../common/crypto" }
+ nym-gateway-requests = { path = "../../../common/gateway-requests" }
+ nym-bandwidth-controller = { path = "../../../common/bandwidth-controller" }
+@@ -32,6 +33,7 @@ nym-validator-client = { path = "../../../common/client-libs/validator-client",
+ nym-socks5-requests = { path = "../../../common/socks5/requests" }
+ nym-ordered-buffer = { path = "../../../common/socks5/ordered-buffer" }
+ nym-service-providers-common = { path = "../../../service-providers/common" }
++nym-pemstore = { path = "../../../common/pemstore" }
+ bytecodec = { workspace = true }
+ httpcodec = { workspace = true }
+ bytes = { workspace = true }
+diff --git a/sdk/rust/nym-sdk/examples/alice.rs b/sdk/rust/nym-sdk/examples/alice.rs
+new file mode 100644
+index 000000000..2fa68a168
+--- /dev/null
++++ b/sdk/rust/nym-sdk/examples/alice.rs
+@@ -0,0 +1,40 @@
++use std::env;
++use nym_sdk::mixnet;
++use nym_sdk::mixnet::MixnetMessageSender;
++use nym_config::environment;
++use nym_sdk::mixnet::client_util;
++#[tokio::main]
++async fn main() {
++    nym_bin_common::logging::setup_logging();
++    let client = client_util::TestClientBuilder::new("alice_drops").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    let mut client = client.connect_to_mixnet().await.unwrap();
++
++    // Be able to get our client address
++    let our_address = client.nym_address();
++    println!("Our client nym address is: {our_address}");
++    let bob = client_util::recipient_from_client_name("bob_drops", 11);
++
++    // Send a message through the mixnet to ourselves
++    client
++        .send_plain_message(bob, "hello there bob! (from alice)
++
++Iste non unde voluptatem eum. Aperiam expedita ipsum consequuntur. Similique aliquid aliquid sit soluta labore.
++
++Enim distinctio corporis qui voluptas facilis ut fuga. Recusandae aspernatur autem velit. Qui aliquam sint dolores enim sint quia. Quisquam placeat provident quo sequi ea et quisquam eligendi. Non autem ut repellendus corporis cum asperiores totam. Quos molestias nisi doloribus.
++
++Saepe et officia et debitis tenetur expedita. Quas quia molestias sequi voluptatem. Fuga repudiandae velit magni neque ut id in porro. Qui consequatur consequatur magnam ducimus rem laboriosam. Non aut quidem saepe voluptatibus ut molestiae quia.
++
++Eaque saepe impedit enim velit et inventore molestias sed. Minima repudiandae mollitia et sapiente temporibus consequatur est ab. Suscipit voluptatibus deleniti alias maiores impedit enim voluptates sequi. Aut rerum impedit vero. Saepe praesentium ad recusandae repellat ut.
++
++Temporibus velit iusto sit temporibus est. Velit sed enim quisquam architecto modi doloremque qui rerum. Libero earum optio repellat dignissimos et.
++")
++        .await
++        .unwrap();
++
++    println!("Waiting for message (ctrl-c to exit)");
++    client
++        .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
++        .await;
++}
+diff --git a/sdk/rust/nym-sdk/examples/bob.rs b/sdk/rust/nym-sdk/examples/bob.rs
+new file mode 100644
+index 000000000..7553a0740
+--- /dev/null
++++ b/sdk/rust/nym-sdk/examples/bob.rs
+@@ -0,0 +1,22 @@
++use nym_sdk::mixnet;
++use nym_sdk::mixnet::MixnetMessageSender;
++use nym_config::environment;
++use nym_sdk::mixnet::client_util;
++#[tokio::main]
++async fn main() {
++    nym_bin_common::logging::setup_logging();
++    let client = client_util::TestClientBuilder::new("bob_drops").await.unwrap()
++        .with_gateway(11)
++        .build().await.unwrap();
++    let mut client = client.connect_to_mixnet().await.unwrap();
++
++    // Be able to get our client address
++    let our_address = client.nym_address();
++    println!("Our client nym address is: {our_address}");
++    
++    
++    println!("Waiting for message (ctrl-c to exit)");
++    client
++        .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
++        .await;
++}
+diff --git a/sdk/rust/nym-sdk/examples/eve.rs b/sdk/rust/nym-sdk/examples/eve.rs
+new file mode 100644
+index 000000000..1ac33c904
+--- /dev/null
++++ b/sdk/rust/nym-sdk/examples/eve.rs
+@@ -0,0 +1,39 @@
++use std::env;
++use nym_sdk::mixnet;
++use nym_sdk::mixnet::MixnetMessageSender;
++use nym_config::environment;
++use nym_sdk::mixnet::client_util;
++#[tokio::main]
++async fn main() {
++    nym_bin_common::logging::setup_logging();
++    let client = client_util::TestClientBuilder::new("eve_drops").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    let mut client = client.connect_to_mixnet().await.unwrap();
++
++    // Be able to get our client address
++    let our_address = client.nym_address();
++    println!("Our client nym address is: {our_address}");
++    let bob = client_util::recipient_from_client_name("bob_drops", 11);
++    // Send a message through the mixnet to ourselves
++    client
++        .send_plain_message(bob, "hello there bob! (from eve)
++
++        Iste non unde voluptatem eum. Aperiam expedita ipsum consequuntur. Similique aliquid aliquid sit soluta labore.
++
++            Enim distinctio corporis qui voluptas facilis ut fuga. Recusandae aspernatur autem velit. Qui aliquam sint dolores enim sint quia. Quisquam placeat provident quo sequi ea et quisquam eligendi. Non autem ut repellendus corporis cum asperiores totam. Quos molestias nisi doloribus.
++
++            Saepe et officia et debitis tenetur expedita. Quas quia molestias sequi voluptatem. Fuga repudiandae velit magni neque ut id in porro. Qui consequatur consequatur magnam ducimus rem laboriosam. Non aut quidem saepe voluptatibus ut molestiae quia.
++
++            Eaque saepe impedit enim velit et inventore molestias sed. Minima repudiandae mollitia et sapiente temporibus consequatur est ab. Suscipit voluptatibus deleniti alias maiores impedit enim voluptates sequi. Aut rerum impedit vero. Saepe praesentium ad recusandae repellat ut.
++
++            Temporibus velit iusto sit temporibus est. Velit sed enim quisquam architecto modi doloremque qui rerum. Libero earum optio repellat dignissimos et.
++                            ")
++        .await
++        .unwrap();
++
++    println!("Waiting for message (ctrl-c to exit)");
++    client
++        .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
++        .await;
++}
+diff --git a/sdk/rust/nym-sdk/examples/init_client.rs b/sdk/rust/nym-sdk/examples/init_client.rs
+new file mode 100644
+index 000000000..bc6040dfd
+--- /dev/null
++++ b/sdk/rust/nym-sdk/examples/init_client.rs
+@@ -0,0 +1,24 @@
++
++use nym_sdk::mixnet::client_util;
++
++
++#[tokio::main]
++async fn main() {
++    let client = client_util::TestClientBuilder::new("someones_client").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    client.setup_client_keys().await.expect("Error generating keys");
++    let client = client_util::TestClientBuilder::new("alice_drops").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    client.setup_client_keys().await.expect("Error generating keys");
++    let client = client_util::TestClientBuilder::new("bob_drops").await.unwrap()
++        .with_gateway(11)
++        .build().await.unwrap();
++    client.setup_client_keys().await.expect("Error generating keys");
++    let client = client_util::TestClientBuilder::new("eve_drops").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    client.setup_client_keys().await.expect("Error generating keys");
++}
++
+diff --git a/sdk/rust/nym-sdk/examples/simple.rs b/sdk/rust/nym-sdk/examples/simple.rs
+index 00ad24dc9..d020526c2 100644
+--- a/sdk/rust/nym-sdk/examples/simple.rs
++++ b/sdk/rust/nym-sdk/examples/simple.rs
+@@ -1,9 +1,13 @@
++use std::env;
+ use nym_sdk::mixnet;
+ use nym_sdk::mixnet::MixnetMessageSender;
+-
++use nym_config::environment;
++use nym_sdk::mixnet::client_util;
+ #[tokio::main]
+ async fn main() {
+     nym_bin_common::logging::setup_logging();
++    let (pubkey, sphinxkey) = environment::get_keys_from_id(4);
++    println!("pubkey of node: {}, sphinxkey of node: {}", pubkey, sphinxkey );
+ 
+     // Passing no config makes the client fire up an ephemeral session and figure shit out on its own
+     // let mut client = mixnet::MixnetClient::connect_new().await.unwrap();
+@@ -12,13 +16,19 @@ async fn main() {
+     // Be able to get our client address
+     let our_address = client.nym_address();
+     println!("Our client nym address is: {our_address}");
+-
++    let someone = client_util::recipient_from_client_name("someones_client", 10);
++    println!("someones client address: {}", someone.identity().to_base58_string());
+     // Send a message through the mixnet to ourselves
+     client
+-        .send_plain_message(*our_address, "hello there")
++        .send_plain_message(*our_address, "hello there :-)")
+         .await
+         .unwrap();
+ 
++    //Send a message to someone
++    client
++        .send_plain_message(someone, "hey someone")
++        .await
++        .unwrap();
+     println!("Waiting for message (ctrl-c to exit)");
+     client
+         .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
+diff --git a/sdk/rust/nym-sdk/examples/someone.rs b/sdk/rust/nym-sdk/examples/someone.rs
+new file mode 100644
+index 000000000..4b8cb364a
+--- /dev/null
++++ b/sdk/rust/nym-sdk/examples/someone.rs
+@@ -0,0 +1,28 @@
++use std::env;
++use nym_sdk::mixnet;
++use nym_sdk::mixnet::MixnetMessageSender;
++use nym_config::environment;
++use nym_sdk::mixnet::client_util;
++#[tokio::main]
++async fn main() {
++    nym_bin_common::logging::setup_logging();
++    let client = client_util::TestClientBuilder::new("someones_client").await.unwrap()
++        .with_gateway(10)
++        .build().await.unwrap();
++    let mut client = client.connect_to_mixnet().await.unwrap();
++
++    // Be able to get our client address
++    let our_address = client.nym_address();
++    println!("Our client nym address is: {our_address}");
++    let bob = client_util::recipient_from_client_name("bob_drops", 11);
++    // Send a message through the mixnet to ourselves
++    client
++        .send_plain_message(bob, "hello there :-) its someone")
++        .await
++        .unwrap();
++
++    println!("Waiting for message (ctrl-c to exit)");
++    client
++        .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
++        .await;
++}
+diff --git a/sdk/rust/nym-sdk/src/mixnet.rs b/sdk/rust/nym-sdk/src/mixnet.rs
+index 57a17c156..4cd4ac948 100644
+--- a/sdk/rust/nym-sdk/src/mixnet.rs
++++ b/sdk/rust/nym-sdk/src/mixnet.rs
+@@ -37,6 +37,7 @@ mod native_client;
+ mod paths;
+ mod socks5_client;
+ mod traits;
++pub mod client_util;
+ 
+ pub use client::{DisconnectedMixnetClient, IncludedSurbs, MixnetClientBuilder};
+ pub use config::Config;
+diff --git a/sdk/rust/nym-sdk/src/mixnet/client.rs b/sdk/rust/nym-sdk/src/mixnet/client.rs
+index 14138b0ba..bac41cdd3 100644
+--- a/sdk/rust/nym-sdk/src/mixnet/client.rs
++++ b/sdk/rust/nym-sdk/src/mixnet/client.rs
+@@ -39,6 +39,8 @@ use std::path::Path;
+ use std::path::PathBuf;
+ use url::Url;
+ use zeroize::Zeroizing;
++use nym_config::environment;
++use nym_topology::gateway;
+ 
+ // The number of surbs to include in a message by default
+ const DEFAULT_NUMBER_OF_SURBS: u32 = 10;
+@@ -381,10 +383,11 @@ where
+             .collect()
+     }
+ 
+-    async fn setup_client_keys(&self) -> Result<()> {
++    pub async fn setup_client_keys(&self) -> Result<()> {
+         let mut rng = OsRng;
+         let key_store = self.storage.key_store();
+ 
++        // TODO does this have to be commented out?
+         if key_store.load_keys().await.is_err() {
+             debug!("Generating new client keys");
+             nym_client_core::init::generate_new_client_keys(&mut rng, key_store).await?;
+@@ -452,7 +455,41 @@ where
+         let user_agent = self.user_agent.clone();
+ 
+         let mut rng = OsRng;
+-        let available_gateways = current_gateways(&mut rng, &nym_api_endpoints, user_agent).await?;
++        let mut available_gateways = Vec::new();
++        let pubkeys = environment::get_pubkey_hashmap();
++        let sphinxkeys = environment::get_sphinxkey_hashmap();
++        available_gateways.push(gateway::Node {
++            owner: None,
++            host: "139.162.247.97".parse().unwrap(),
++            mix_host: "139.162.247.97:1789".parse().unwrap(),
++            identity_key: pubkeys.get(&10).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            sphinx_key: sphinxkeys.get(&10).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            clients_ws_port: 9000,
++            clients_wss_port: None,
++            version: "1.1.0".into(),
++        },
++        );
++        available_gateways.push(gateway::Node {
++            owner: None,
++            host: "139.162.247.98".parse().unwrap(),
++            mix_host: "139.162.247.98:1789".parse().unwrap(),
++            identity_key: pubkeys.get(&11).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            sphinx_key: sphinxkeys.get(&11).unwrap().to_string()
++                .parse()
++                .unwrap(),
++            clients_ws_port: 9000,
++            clients_wss_port: None,
++            version: "1.1.0".into(),
++        },
++        );
++        // ^^ better gateways
++        //let available_gateways = current_gateways(&mut rng, &nym_api_endpoints, user_agent).await?;
+ 
+         Ok(GatewaySetup::New {
+             specification: selection_spec,
+@@ -472,10 +509,8 @@ where
+         if !matches!(self.state, BuilderState::New) {
+             return Err(Error::ReregisteringGatewayNotSupported);
+         }
+-
+         self.print_all_registered_gateway_identities().await;
+         self.print_selected_gateway().await;
+-
+         // Try to set active gateway to the same as the user chosen one, if it's in the set of
+         // gateways that is already registered.
+         if let Some(ref user_chosen_gateway) = self.config.user_chosen_gateway {
+@@ -486,10 +521,8 @@ where
+                 debug!("user chosen gateway is already registered, set as active");
+             }
+         }
+-
+         let active_gateway =
+             get_active_gateway_identity(self.storage.gateway_details_store()).await?;
+-
+         // Determine the gateway setup based on the currently active gateway and the user-chosen
+         // gateway.
+         let gateway_setup = match (self.config.user_chosen_gateway.as_ref(), active_gateway) {
+@@ -514,7 +547,6 @@ where
+             self.storage.gateway_details_store(),
+         )
+         .await?;
+-
+         set_active_gateway(
+             self.storage.gateway_details_store(),
+             &init_results.gateway_id().to_base58_string(),
+@@ -561,7 +593,6 @@ where
+     async fn connect_to_mixnet_common(mut self) -> Result<(BaseClient, Recipient)> {
+         self.setup_client_keys().await?;
+         self.setup_gateway().await?;
+-
+         let nyxd_endpoints = self.get_nyxd_endpoints();
+         let nym_api_endpoints = self.get_api_endpoints();
+ 
+@@ -569,11 +600,9 @@ where
+         let base_config = self
+             .config
+             .as_base_client_config(nyxd_endpoints, nym_api_endpoints.clone());
+-
+         let mut base_builder: BaseClientBuilder<_, _> =
+             BaseClientBuilder::new(&base_config, self.storage, self.dkg_query_client)
+                 .with_wait_for_gateway(self.wait_for_gateway);
+-
+         if let Some(user_agent) = self.user_agent {
+             base_builder = base_builder.with_user_agent(user_agent);
+         }
+@@ -589,7 +618,6 @@ where
+         if let Some(gateway_transceiver) = self.custom_gateway_transceiver {
+             base_builder = base_builder.with_gateway_transceiver(gateway_transceiver);
+         }
+-
+         let started_client = base_builder.start_base().await?;
+         self.state = BuilderState::Registered {};
+         let nym_address = started_client.address;
+diff --git a/sdk/rust/nym-sdk/src/mixnet/client_util.rs b/sdk/rust/nym-sdk/src/mixnet/client_util.rs
+new file mode 100644
+index 000000000..69f72cb9a
+--- /dev/null
++++ b/sdk/rust/nym-sdk/src/mixnet/client_util.rs
+@@ -0,0 +1,78 @@
++use std::env;
++use std::ops::Add;
++use std::path::{Path, PathBuf};
++use nym_client_core::client::base_client::storage::{GatewaysDetailsStore, MixnetClientStorage, OnDiskPersistent};
++use nym_config::environment;
++use nym_pemstore::load_key;
++use nym_sphinx::addressing::clients::ClientEncryptionKey;
++use nym_sphinx::addressing::Recipient;
++use crate::mixnet::{ClientIdentity, CredentialStorage, DisconnectedMixnetClient, MixnetClientBuilder, NodeIdentity, StoragePaths};
++
++pub struct TestClientBuilder {
++    gateway: Option<String>,
++    storage: StoragePaths
++}
++///
++/// Creating a MixnetClient for our testing purposes. Must specify the name of the client (currently),
++/// because a storage will be created.
++///
++impl TestClientBuilder {
++
++    ///
++    /// Create a new TestClientBuilder with the name of the client you want to use. This is needed
++    /// for the storage path where the keys will be stored.
++    ///
++    pub async fn new(name: &str) -> Result<Self, env::VarError> {
++        // Directory where keys are stored for the test clients
++        let dir = client_key_dir();
++        let storage = StoragePaths::new_from_dir(PathBuf::from(dir.clone().add(name))).unwrap();
++        Ok(TestClientBuilder {
++            gateway: None,
++            storage,
++        })
++    }
++
++    ///
++    /// Choose a specific gateway (using the id used in our global hashmap)
++    ///
++    pub fn with_gateway(mut self, gateway: u32) -> Self {
++        self.gateway = Some(gateway_by_id(gateway));
++        self
++    }
++
++    ///
++    /// Build a mixnet client with the desired properties
++    ///
++    pub async fn build(self) -> crate::Result<DisconnectedMixnetClient<OnDiskPersistent>> {
++        let mut client = MixnetClientBuilder::new_with_default_storage(self.storage)
++            .await
++            .unwrap();
++        // Add our custom gateway if specified
++        if let Some(gateway_id) = self.gateway {
++            client = client.request_gateway(gateway_id.clone())
++        }
++        client.build()
++    }
++}
++pub fn recipient_from_client_name(client_name: &str, gateway: u32) -> Recipient {
++    let dir = client_key_dir();
++    let ikey_path = format!("{}{}/public_identity.pem", client_key_dir(), client_name);
++    let ekey_path = format!("{}{}/public_encryption.pem", client_key_dir(), client_name);
++    // read public identity key of recipient from specified path
++    let ikey : ClientIdentity = load_key(Path::new(&ikey_path)).unwrap();
++    // read public encryption key of attacker from specified path
++    let ekey: ClientEncryptionKey = load_key(Path::new(&ekey_path)).unwrap();
++    println!("ikey {} ekey {}", ikey_path, ekey_path);
++    Recipient::new(ikey, ekey, NodeIdentity::from_base58_string(gateway_by_id(gateway))
++        .unwrap())
++}
++fn client_key_dir() -> String {
++    let mut proj_dir = environment::get_project_dir();
++    if (!proj_dir.chars().last().unwrap().eq(&'/')) {
++        proj_dir.push_str("/");
++    }
++    format!("{}client_keys/", proj_dir)
++}
++fn gateway_by_id(id: u32) -> String {
++    environment::get_pubkey_hashmap().get(&id).unwrap().clone()
++}
+diff --git a/shadow/init.sh b/shadow/init.sh
+new file mode 100644
+index 000000000..fab003db3
+--- /dev/null
++++ b/shadow/init.sh
+@@ -0,0 +1,14 @@
++#!/bin/bash
++../target/release/nym-node --config-env-file ../envs/sandbox.env run --id 4 --public-ips "178.79.143.64" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode --init-only
++../target/release/nym-node --config-env-file ../envs/sandbox.env run --id 5 --public-ips "178.79.143.65" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode --init-only
++
++../target/release/nym-node --config-env-file ../envs/sandbox.env run --id 6 --public-ips "178.79.143.66" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode --init-only
++
++../target/release/nym-node --config-env-file ../envs/sandbox.env run --id 10 --public-ips "139.162.247.97" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode entry-gateway --init-only
++../target/release/nym-node --config-env-file ../envs/sandbox.env run --id 11 --public-ips "139.162.247.98" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode exit-gateway --init-only
++cargo build --example alice --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example someone --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example bob --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example eve --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo run --example init_client --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++sh runsend.sh
+diff --git a/shadow/runsend.sh b/shadow/runsend.sh
+new file mode 100755
+index 000000000..fa0d82b9c
+--- /dev/null
++++ b/shadow/runsend.sh
+@@ -0,0 +1,7 @@
++#!/bin/bash
++cargo build --example simple --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example someone --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example alice --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example bob --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++cargo build --example eve --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
++
+diff --git a/shadow/runshadow.sh b/shadow/runshadow.sh
+new file mode 100644
+index 000000000..45e731dfe
+--- /dev/null
++++ b/shadow/runshadow.sh
+@@ -0,0 +1,5 @@
++#!/bin/bash
++# The shadow.data directory must be deleted after every simulation
++rm -rf shadow.data 
++# Run the simulation with the given configuration file and write the output to shadow.log
++shadow shadow.yaml > shadow.log
+diff --git a/shadow/runtests.sh b/shadow/runtests.sh
+new file mode 100644
+index 000000000..016406505
+--- /dev/null
++++ b/shadow/runtests.sh
+@@ -0,0 +1,9 @@
++#!/bin/bash
++rm -rf ../client_keys
++sh init.sh
++for i in {1..10}
++do
++	sh runshadow.sh
++	python timestamps.py 3 >> testlog
++done
++
+diff --git a/shadow/shadow.yaml b/shadow/shadow.yaml
+new file mode 100644
+index 000000000..ccf7ef90a
+--- /dev/null
++++ b/shadow/shadow.yaml
+@@ -0,0 +1,115 @@
++general:
++  stop_time: 40s
++  model_unblocked_syscall_latency: true
++  log_level: debug
++  seed: 1
++
++network:
++  graph:
++    type: 1_gbit_switch
++
++hosts:
++  mix: &mixnode
++    network_node_id: 0
++    ip_addr: "178.79.143.64"
++    processes:
++    - path: ../target/release/nym-node
++      args: --config-env-file ../../../../envs/sandbox.env run --id 4 --public-ips "178.79.143.64" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode
++      start_time: 3s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  mix2:
++    network_node_id: 0
++    ip_addr: "178.79.143.65"
++    processes:
++    - path: ../target/release/nym-node
++      args: --config-env-file ../../../../envs/sandbox.env run --id 5 --public-ips "178.79.143.65" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode
++      start_time: 3s
++      expected_final_state: running
++  mix3:
++    network_node_id: 0
++    ip_addr: "178.79.143.66"
++    processes:
++    - path: ../target/release/nym-node
++      args: --config-env-file ../../../../envs/sandbox.env run --id 6 --public-ips "178.79.143.66" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode mixnode
++      start_time: 3s
++      expected_final_state: running
++  sandbox-nym-api1.nymtech.net:
++    network_node_id: 0
++    processes:
++    - path: python3
++      args: -m http.server 80
++      start_time: 3s
++      expected_final_state: running
++  validator.nymtech.net:
++    network_node_id: 0
++    processes:
++    - path: python3
++      args: -m http.server 80
++      start_time: 10s
++      expected_final_state: running
++  nymtech.net:
++    network_node_id: 0
++    processes:
++    - path: python3
++      args: -m http.server 80
++      start_time: 0s
++      expected_final_state: running
++  gateway1:
++    network_node_id: 0
++    ip_addr: "139.162.247.97"
++    processes:
++    - path: ../target/release/nym-node
++      args: --config-env-file ../../../../envs/sandbox.env run --id 10 --public-ips "139.162.247.97" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode entry-gateway
++      start_time: 3s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  gateway2:
++    network_node_id: 0
++    ip_addr: "139.162.247.98"
++    processes:
++    - path: ../target/release/nym-node
++      args: --config-env-file ../../../../envs/sandbox.env run --id 11 --public-ips "139.162.247.98" --hostname "example.com" --http-bind-address 0.0.0.0:8080 --mixnet-bind-address 0.0.0.0:1789 --location Germany --mode exit-gateway
++      start_time: 3s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  alice:
++    network_node_id: 0
++    processes:
++    - path: cargo
++      args: run --example alice --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++      start_time: 11s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  someone:
++    network_node_id: 0
++    processes:
++    - path: cargo
++      args: run --example someone --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++      start_time: 12s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  bob:
++    network_node_id: 0
++    processes:
++    - path: cargo
++      args: run --example bob --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++      start_time: 10s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++  eve:
++    network_node_id: 0
++    processes:
++    - path: cargo
++      args: run --example eve --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++      start_time: 13s
++      expected_final_state: running
++      environment:
++        RUST_LOG: debug
++
+diff --git a/shadow/timestamps.py b/shadow/timestamps.py
+new file mode 100644
+index 000000000..34be0d8bc
+--- /dev/null
++++ b/shadow/timestamps.py
+@@ -0,0 +1,64 @@
++"""Fragging timestamp evaluation for the Nym testbed.
++
++This script evaluates the timings after which fragment sets have been
++completed. We use it to test the hypothesis that we can notice a Fragging
++attack by an increase in time-to-fragment-set-completion.
++"""
++import sys
++from pathlib import Path
++
++DEFAULT_THRESHOLD = 2000
++
++
++def read_timestamps(threshold):
++    p = Path("./shadow.data/hosts/bob/cargo.1000.stdout")
++    if not p.exists():
++        # Can happen when installing Rust via rustup
++        p = Path("./shadow.data/hosts/bob/rustup.1000.stdout")
++
++    with open(p) as file:
++        set_map = {}
++        frag_to_sender = {}
++
++        for line in file:
++            if line.startswith("Insert"):
++                line = line.strip()
++                line = line.split("-")
++                line = line[1:]
++                frag_set = (line[0].split(":"))[1]
++                frag_idx = int(line[1].split(":")[1])
++                timestamp = int((line[2].split(":"))[1])
++                total_frags = int((line[3].split(":"))[1])
++                if not (frag_set in set_map):
++                    # (timestamp of first frag, frag ids, timestamp of latest frag, total_frags)
++                    set_map[frag_set] = (timestamp, {frag_idx}, timestamp, total_frags)
++                else:
++                    info = set_map[frag_set]
++                    set_map[frag_set] = (info[0], info[1] | {frag_idx}, max(timestamp, info[2]), total_frags)
++            elif line.startswith("Received:"):
++                if "its someone" in line:
++                    sender = "someone"
++                elif "(from eve)" in line:
++                    sender = "eve"
++                elif "(from alice)" in line:
++                    sender = "alice"
++                frag_to_sender[frag_set] = sender
++
++        for frag_set, info in set_map.items():
++            if len(info[1]) == info[3]:
++                sender = frag_to_sender[frag_set]
++                duration = info[2] - info[0]
++                print(f"Fragment set {frag_set} (sent by {sender}) is complete. Time duration between first and last fragment: {duration} milliseconds.")
++                if duration >= threshold:
++                    print("The duration is longer than our threshold of", threshold, "seconds. It is likely that packets were dropped. This fragment set was probably sent by our victim.")
++            else:
++                print("Fragment set ", frag_set, " did not complete. Amount of frags: ", info[1])
++            print("")
++
++if __name__ == "__main__":
++    print("Simulation results:")
++    threshold = DEFAULT_THRESHOLD
++    if len(sys.argv) > 1:
++        threshold = int(sys.argv[1])
++    print(f"Threshold: {threshold} milliseconds (change by giving it as an argument)\n")
++    read_timestamps(threshold)
