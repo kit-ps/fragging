@@ -1,5 +1,5 @@
 [package]
-name = "frinx"
+name = "scylla"
 version = "0.1.0"
 edition = "2024"
 
@@ -18,5 +18,5 @@ zears = { version = "0.2.1", features = ["simd"] }
 criterion = { version = "0.7", features = ["html_reports"] }
 
 [[bench]]
-name = "frinx"
+name = "scylla"
 harness = false

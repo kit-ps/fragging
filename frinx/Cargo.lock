@@ -306,22 +306,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
-name = "frinx"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "criterion",
- "curve25519-dalek",
- "rand",
- "rand_chacha",
- "serde",
- "sha2",
- "sha3",
- "thiserror",
- "zears",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,6 +592,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "scylla"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "criterion",
+ "curve25519-dalek",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "sha2",
+ "sha3",
+ "thiserror",
+ "zears",
 ]
 
 [[package]]

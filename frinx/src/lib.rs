@@ -1,4 +1,4 @@
-//! Prototype implementation of Frinx, the mix format with fragmentation.
+//! Prototype implementation of Scylla, the mix format with fragmentation.
 use std::io::Write;
 
 use zears::Aez;
@@ -222,16 +222,16 @@ fn pi_inv(key: [u8; KAPPA], data: &[u8]) -> Vec<u8> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Frinx {
+pub struct Scylla {
     max_path_length: u32,
     payload_size: u32,
 }
 
-impl Frinx {
+impl Scylla {
     const BYTES_PER_HOP: usize = 2 * KAPPA + 1;
 
     pub fn new(max_path_length: u32, payload_size: u32) -> Self {
-        Frinx {
+        Scylla {
             max_path_length,
             payload_size,
         }
@@ -505,7 +505,7 @@ pub mod test {
     fn test_create_onion() {
         let mut success = false;
         let mut rng = rand::rng();
-        let frinx = Frinx::new(5, 128);
+        let scylla = Scylla::new(5, 128);
 
         let private_keys = &[
             Scalar::from_bytes_mod_order_wide(&rng.random()),
@@ -521,7 +521,7 @@ pub mod test {
         ];
         let path1 = nodes;
         let path2 = &[nodes[0], nodes[2], nodes[1], nodes[3]];
-        let mut onions = frinx
+        let mut onions = scylla
             .create_onions(
                 &[path1, path2],
                 &[13; KAPPA],
@@ -538,7 +538,7 @@ pub mod test {
             let (hop, onion) = onions.pop().unwrap();
             let private_key = &private_keys[hop[0] as usize];
 
-            let procd = frinx.process(private_key, &onion).unwrap();
+            let procd = scylla.process(private_key, &onion).unwrap();
 
             match procd {
                 ProcessedOnion::Relay { next_hop, onion } => {
@@ -559,7 +559,7 @@ pub mod test {
                         frags.len()
                     );
                     let set = frags.iter().map(|x| x.1.clone()).collect::<Vec<_>>();
-                    let data = frinx.defrag(&set);
+                    let data = scylla.defrag(&set);
                     match data {
                         Ok(x) => {
                             println!("Complete: {x:?}");
@@ -578,7 +578,7 @@ pub mod test {
     #[test]
     fn test_surb() {
         let mut rng = rand::rng();
-        let frinx = Frinx::new(5, 128);
+        let scylla = Scylla::new(5, 128);
 
         let private_keys = &[
             Scalar::from_bytes_mod_order_wide(&rng.random()),
@@ -593,34 +593,34 @@ pub mod test {
             Node::from_private_key([3; KAPPA], &private_keys[3]),
         ];
         let reply_id = rng.random();
-        let (secrets, surb) = frinx.create_surb(nodes, &[42; KAPPA], reply_id);
+        let (secrets, surb) = scylla.create_surb(nodes, &[42; KAPPA], reply_id);
         let text = b"Widdewiddewitt";
 
         let mut onion = concat(surb, text);
 
         let ProcessedOnion::Relay { onion: o, .. } =
-            frinx.process(&private_keys[0], &onion).unwrap()
+            scylla.process(&private_keys[0], &onion).unwrap()
         else {
             panic!()
         };
         onion = o;
 
         let ProcessedOnion::Relay { onion: o, .. } =
-            frinx.process(&private_keys[1], &onion).unwrap()
+            scylla.process(&private_keys[1], &onion).unwrap()
         else {
             panic!()
         };
         onion = o;
 
         let ProcessedOnion::Relay { onion: o, .. } =
-            frinx.process(&private_keys[2], &onion).unwrap()
+            scylla.process(&private_keys[2], &onion).unwrap()
         else {
             panic!()
         };
         onion = o;
 
         let ProcessedOnion::Reply { destination, reply_id: r_id, data } =
-            frinx.process(&private_keys[3], &onion).unwrap()
+            scylla.process(&private_keys[3], &onion).unwrap()
         else {
             panic!()
         };
@@ -628,7 +628,7 @@ pub mod test {
         assert_eq!(destination, [42; KAPPA]);
         assert_eq!(r_id, reply_id);
 
-        let payload = frinx.unwrap_reply(&secrets, &data);
+        let payload = scylla.unwrap_reply(&secrets, &data);
         assert_eq!(payload, text);
     }
 }
