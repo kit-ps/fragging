@@ -686,7 +686,7 @@ index 2120b3342..2d96aa5e2 100644
      pub(crate) local_identity: Arc<identity::KeyPair>,
      pub(crate) only_coconut_credentials: bool,
 diff --git a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
-index c15a27302..8d8b50037 100644
+index c15a27302..13e614574 100644
 --- a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
 +++ b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
 @@ -33,7 +33,7 @@ use thiserror::Error;
@@ -704,7 +704,7 @@ index c15a27302..8d8b50037 100644
      fn forward_packet(&self, mix_packet: MixPacket) {
 +        // Drop OUTGOING packets from our victim, creating a delay at the recipient's end
 +        let alice = client_util::recipient_from_client_name("alice_drops", 10);
-+        let drop_chance = 0.3;
++        let drop_chance: f32 = ::std::env::var("FRAGGING_DROP_CHANCE").unwrap().parse().unwrap();
 +        let rng: f32 = random();
 +        if self.client.address.as_base58_string() == alice.identity().to_base58_string() {
 +            log::debug!("its alice!");
@@ -1466,6 +1466,26 @@ index 000000000..fab003db3
 +cargo build --example eve --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
 +cargo run --example init_client --manifest-path ../sdk/rust/nym-sdk/Cargo.toml
 +sh runsend.sh
+diff --git a/shadow/runmany.sh b/shadow/runmany.sh
+new file mode 100755
+index 000000000..fc64c0057
+--- /dev/null
++++ b/shadow/runmany.sh
+@@ -0,0 +1,14 @@
++#!/bin/bash
++set -euo pipefail
++
++for chance in 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
++do
++    for seed in 1 2 3 4 5
++    do
++        sed -i "s/seed: ./seed: $seed/" shadow.yaml
++        sed -i "s/FRAGGING_DROP_CHANCE: .*$/FRAGGING_DROP_CHANCE: '$chance'/" shadow.yaml
++        bash init.sh
++        bash runshadow.sh || true
++        python timestamps.py 1000 2>&1 >outputs/chance_"$chance"_seed_"$seed".txt
++    done
++done
 diff --git a/shadow/runsend.sh b/shadow/runsend.sh
 new file mode 100755
 index 000000000..fa0d82b9c
@@ -1507,10 +1527,10 @@ index 000000000..016406505
 +
 diff --git a/shadow/shadow.yaml b/shadow/shadow.yaml
 new file mode 100644
-index 000000000..ccf7ef90a
+index 000000000..ff93b88d5
 --- /dev/null
 +++ b/shadow/shadow.yaml
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,117 @@
 +general:
 +  stop_time: 40s
 +  model_unblocked_syscall_latency: true
@@ -1579,6 +1599,7 @@ index 000000000..ccf7ef90a
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        FRAGGING_DROP_CHANCE: '0.1'
 +  gateway2:
 +    network_node_id: 0
 +    ip_addr: "139.162.247.98"
@@ -1589,6 +1610,7 @@ index 000000000..ccf7ef90a
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        FRAGGING_DROP_CHANCE: '0.1'
 +  alice:
 +    network_node_id: 0
 +    processes:
