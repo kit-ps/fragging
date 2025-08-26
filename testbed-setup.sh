@@ -13,3 +13,4 @@ REPO="https://github.com/nymtech/nym"
 git clone --revision=$PATCH_BASE --depth=1 "$REPO"
 cd nym
 git apply ../testbed.patch
+mkdir shadow/outputs
