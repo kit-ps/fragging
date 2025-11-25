@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cd nym
-cargo build --release
+NYM_AVERAGE_PACKET_DELAY=50 cargo build --release
 
 cd shadow
 bash init.sh
