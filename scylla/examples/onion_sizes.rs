@@ -14,11 +14,11 @@ fn main() {
             for &fragment_count in FRAGMENT_COUNTS {
                 let paths = vec![path.clone(); fragment_count];
                 let mut fragments = Vec::new();
-                fragments.push(vec![1u8; payload_size - 3 * 16]);
+                fragments.push(vec![1u8; payload_size - 4 * 16]);
                 for i in 1..fragment_count {
                     fragments.push(vec![i as u8 + 1; payload_size]);
                 }
-                let onions = scylla.create_onions(&paths, &[0; 16], fragments.clone()).unwrap();
+                let onions = scylla.create_onions(&paths, &[0; 32], fragments.clone()).unwrap();
                 let onion_size = onions.iter().map(|o| o.len()).sum::<usize>();
                 println!("{length},{fragment_count},{payload_size},{onion_size}");
             }

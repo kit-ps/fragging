@@ -19,7 +19,20 @@ const KAPPA: usize = 16;
 const ALPHA_LEN: usize = 32;
 const AEZ_NONCE: &[u8] = &[0];
 
-pub type Address = [u8; KAPPA];
+// These sizes are adjusted to be compatible with Nym:
+// https://github.com/nymtech/sphinx/blob/develop/src/constants.rs
+// NODE_ADDRESS_LENGTH + DELAY_LENGTH + VERSION_LENGTH
+// No need for the flag byte, we also have that in Scylla
+const PER_HOP_META_LENGTH: usize = 32 + 8 + 3;
+// DESTINATION_ADDRESS_LENGTH
+const FINAL_HOP_META_LENGTH: usize = 32;
+// DESTINATION_ADDRESS_LENGTH + IDENTIFIER + VERSION_LENGTH
+const REPLY_META_LENGTH: usize = 32 + 16 + 3;
+
+pub type Address = [u8; 32];
+pub type PerHopMeta = [u8; PER_HOP_META_LENGTH];
+pub type FinalHopMeta = [u8; FINAL_HOP_META_LENGTH];
+pub type ReplyMeta = [u8; REPLY_META_LENGTH];
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -64,7 +77,7 @@ impl Node {
 #[derive(Debug, Clone)]
 pub enum ProcessedOnion {
     Relay {
-        next_hop: Address,
+        meta: PerHopMeta,
         onion: Vec<u8>,
     },
     Fragment {
@@ -73,8 +86,7 @@ pub enum ProcessedOnion {
         data: Vec<u8>,
     },
     Reply {
-        destination: Address,
-        reply_id: u128,
+        meta: ReplyMeta,
         data: Vec<u8>,
     },
 }
@@ -228,7 +240,7 @@ pub struct Scylla {
 }
 
 impl Scylla {
-    const BYTES_PER_HOP: usize = 2 * KAPPA + 1;
+    const BYTES_PER_HOP: usize = PER_HOP_META_LENGTH + KAPPA + 1;
 
     pub fn new(max_path_length: u32, payload_size: u32) -> Self {
         Scylla {
@@ -240,7 +252,7 @@ impl Scylla {
     pub fn create_onions<A: AsRef<[Node]>>(
         &self,
         paths: &[A],
-        destination: &Address,
+        destination: &FinalHopMeta,
         mut fragments: Vec<Vec<u8>>,
     ) -> Result<Vec<Vec<u8>>> {
         if fragments.len() != paths.len() {
@@ -249,7 +261,7 @@ impl Scylla {
         if fragments.is_empty() {
             return Ok(Vec::new());
         }
-        if fragments[0].len() + 3 * KAPPA != self.payload_size as usize {
+        if fragments[0].len() + 2*KAPPA + FINAL_HOP_META_LENGTH != self.payload_size as usize {
             return Err(Error::InvalidFragmentSize);
         }
         for fragment in &fragments[1..] {
@@ -285,11 +297,11 @@ impl Scylla {
             .zip(transformed.iter())
             .enumerate()
             .map(|(i, (path, payload))| {
-                let mut final_info = [0u8; 2 * KAPPA + 1];
+                let mut final_info = [0u8; REPLY_META_LENGTH + 1];
                 final_info[0] = Flag::Fragment as u8;
                 final_info[KAPPA + 1 - usize::BITS as usize / 8..KAPPA + 1]
                     .copy_from_slice(&i.to_be_bytes());
-                final_info[KAPPA + 1..].copy_from_slice(&frag_set_id);
+                final_info[KAPPA + 1..2 * KAPPA + 1].copy_from_slice(&frag_set_id);
                 self.wrap(path.as_ref(), &final_info, payload).1
             })
             .collect();
@@ -300,7 +312,7 @@ impl Scylla {
     fn wrap(
         &self,
         path: &[Node],
-        final_info: &[u8; 2 * KAPPA + 1],
+        final_info: &[u8; REPLY_META_LENGTH + 1],
         payload: &[u8],
     ) -> (Vec<EdwardsPoint>, Vec<u8>) {
         let mut rng = rand::rng();
@@ -332,7 +344,7 @@ impl Scylla {
             filler_string = xor(extended, &buffer[header_length - i * Self::BYTES_PER_HOP..]);
         }
 
-        let mut buffer = [0u8; 2 * KAPPA + 1];
+        let mut buffer = [0u8; REPLY_META_LENGTH + 1];
         rho(h_rho(shared_secrets.last().unwrap()), &mut buffer);
 
         let mut padding =
@@ -353,10 +365,10 @@ impl Scylla {
             let next_secret = &shared_secrets[i + 1];
             let shared_secret = &shared_secrets[i];
 
-            let mut info = [0u8; 2 * KAPPA + 1];
+            let mut info = [0u8; PER_HOP_META_LENGTH + KAPPA + 1];
             info[0] = Flag::Relay as u8;
-            info[1..1 + KAPPA].copy_from_slice(&next_hop.address);
-            info[1 + KAPPA..].copy_from_slice(&mu(&h_mu(next_secret), &beta));
+            info[1..1 + 32].copy_from_slice(&next_hop.address);
+            info[1 + PER_HOP_META_LENGTH..].copy_from_slice(&mu(&h_mu(next_secret), &beta));
 
             rho(h_rho(shared_secret), &mut buffer);
             beta = xor(concat(info, beta), &buffer);
@@ -381,7 +393,7 @@ impl Scylla {
     }
 
     fn header_length(&self) -> u32 {
-        (2 * KAPPA as u32 + 1) * self.max_path_length
+        Self::BYTES_PER_HOP as u32 * (self.max_path_length - 1) + (1 + REPLY_META_LENGTH as u32)
     }
 
     pub fn process(&self, private_key: &Scalar, onion: &[u8]) -> Result<ProcessedOnion> {
@@ -412,8 +424,8 @@ impl Scylla {
 
         match info[0] {
             _ if info[0] == Flag::Relay as u8 => {
-                let next_hop: &[u8; KAPPA] = &info[1..1 + KAPPA].try_into().unwrap();
-                let next_mac = &info[1 + KAPPA..];
+                let meta: &[u8; PER_HOP_META_LENGTH] = &info[1..1 + PER_HOP_META_LENGTH].try_into().unwrap();
+                let next_mac = &info[1 + PER_HOP_META_LENGTH..];
                 let blinded_alpha = alpha * h_b(&alpha, &shared_secret);
 
                 let mut output = vec![];
@@ -422,13 +434,13 @@ impl Scylla {
                 output.write_all(next_mac).unwrap();
                 output.write_all(&delta).unwrap();
                 Ok(ProcessedOnion::Relay {
-                    next_hop: *next_hop,
+                    meta: *meta,
                     onion: output,
                 })
             }
             _ if info[0] == Flag::Fragment as u8 => {
                 let index = u128::from_be_bytes(info[1..1 + KAPPA].try_into().unwrap());
-                let set_id = u128::from_be_bytes(info[1 + KAPPA..].try_into().unwrap());
+                let set_id = u128::from_be_bytes(info[1 + KAPPA..1 + 2 * KAPPA].try_into().unwrap());
                 Ok(ProcessedOnion::Fragment {
                     set_id,
                     index,
@@ -436,11 +448,9 @@ impl Scylla {
                 })
             }
             _ if info[0] == Flag::Deliver as u8 => {
-                let destination: [u8; KAPPA] = info[1..1 + KAPPA].try_into().unwrap();
-                let reply_id = u128::from_be_bytes(info[1 + KAPPA..].try_into().unwrap());
+                let meta: [u8; REPLY_META_LENGTH] = info[1..1 + REPLY_META_LENGTH].try_into().unwrap();
                 Ok(ProcessedOnion::Reply {
-                    destination,
-                    reply_id,
+                    meta,
                     data: delta,
                 })
             }
@@ -448,7 +458,7 @@ impl Scylla {
         }
     }
 
-    pub fn defrag<A: AsRef<[u8]>>(&self, fragments: &[A]) -> Result<(Address, Vec<u8>)> {
+    pub fn defrag<A: AsRef<[u8]>>(&self, fragments: &[A]) -> Result<(FinalHopMeta, Vec<u8>)> {
         let mut data = aont_inv(fragments)?
             .into_iter()
             .flatten()
@@ -458,7 +468,7 @@ impl Scylla {
         }
 
         data.drain(..KAPPA);
-        let address = data.drain(..KAPPA).collect::<Vec<_>>().try_into().unwrap();
+        let address = data.drain(..FINAL_HOP_META_LENGTH).collect::<Vec<_>>().try_into().unwrap();
 
         Ok((address, data))
     }
@@ -466,13 +476,11 @@ impl Scylla {
     pub fn create_surb(
         &self,
         path: &[Node],
-        destination: &Address,
-        reply_id: u128,
+        meta: &ReplyMeta,
     ) -> (Vec<[u8; KAPPA]>, Vec<u8>) {
-        let mut final_info = [0u8; 2 * KAPPA + 1];
+        let mut final_info = [0u8; REPLY_META_LENGTH + 1];
         final_info[0] = Flag::Deliver as u8;
-        final_info[1..KAPPA + 1].copy_from_slice(destination);
-        final_info[KAPPA + 1..].copy_from_slice(&reply_id.to_be_bytes());
+        final_info[1..].copy_from_slice(meta);
         let (secrets, surb) = self.wrap(path, &final_info, &[]);
         let secrets = secrets.iter().map(h_pi).collect::<Vec<_>>();
         (secrets, surb)
@@ -491,6 +499,8 @@ impl Scylla {
 pub mod test {
     use super::*;
     use std::collections::HashMap;
+
+    const ADDR_LEN: usize = 32;
 
     #[test]
     fn test_aont() {
@@ -514,22 +524,22 @@ pub mod test {
             Scalar::from_bytes_mod_order_wide(&rng.random()),
         ];
         let nodes = &[
-            Node::from_private_key([0; KAPPA], &private_keys[0]),
-            Node::from_private_key([1; KAPPA], &private_keys[1]),
-            Node::from_private_key([2; KAPPA], &private_keys[2]),
-            Node::from_private_key([3; KAPPA], &private_keys[3]),
+            Node::from_private_key([0; ADDR_LEN], &private_keys[0]),
+            Node::from_private_key([1; ADDR_LEN], &private_keys[1]),
+            Node::from_private_key([2; ADDR_LEN], &private_keys[2]),
+            Node::from_private_key([3; ADDR_LEN], &private_keys[3]),
         ];
         let path1 = nodes;
         let path2 = &[nodes[0], nodes[2], nodes[1], nodes[3]];
         let mut onions = scylla
             .create_onions(
                 &[path1, path2],
-                &[13; KAPPA],
-                vec![vec![2; 128 - 3 * KAPPA], vec![3; 128]],
+                &[13; ADDR_LEN],
+                vec![vec![2; 128 - 4 * KAPPA], vec![3; 128]],
             )
             .unwrap()
             .into_iter()
-            .map(|x| ([0u8; KAPPA], x))
+            .map(|x| ([0u8; ADDR_LEN], x))
             .collect::<Vec<_>>();
 
         let mut fragments = HashMap::<u128, Vec<(u128, Vec<u8>)>>::new();
@@ -541,9 +551,9 @@ pub mod test {
             let procd = scylla.process(private_key, &onion).unwrap();
 
             match procd {
-                ProcessedOnion::Relay { next_hop, onion } => {
-                    println!("Relaying to {next_hop:?}");
-                    onions.push((next_hop, onion));
+                ProcessedOnion::Relay { meta, onion } => {
+                    println!("Relaying to {meta:?}");
+                    onions.push((meta[..ADDR_LEN].try_into().unwrap(), onion));
                 }
                 ProcessedOnion::Fragment {
                     set_id,
@@ -563,7 +573,7 @@ pub mod test {
                     match data {
                         Ok(x) => {
                             println!("Complete: {x:?}");
-                            success = x.0 == [13; KAPPA] && x.1.iter().all(|x| *x == 2 || *x == 3);
+                            success = x.0 == [13; ADDR_LEN] && x.1.iter().all(|x| *x == 2 || *x == 3);
                         }
                         Err(_) => println!("Still incomplete"),
                     }
@@ -587,13 +597,16 @@ pub mod test {
             Scalar::from_bytes_mod_order_wide(&rng.random()),
         ];
         let nodes = &[
-            Node::from_private_key([0; KAPPA], &private_keys[0]),
-            Node::from_private_key([1; KAPPA], &private_keys[1]),
-            Node::from_private_key([2; KAPPA], &private_keys[2]),
-            Node::from_private_key([3; KAPPA], &private_keys[3]),
+            Node::from_private_key([0; ADDR_LEN], &private_keys[0]),
+            Node::from_private_key([1; ADDR_LEN], &private_keys[1]),
+            Node::from_private_key([2; ADDR_LEN], &private_keys[2]),
+            Node::from_private_key([3; ADDR_LEN], &private_keys[3]),
         ];
-        let reply_id = rng.random();
-        let (secrets, surb) = scylla.create_surb(nodes, &[42; KAPPA], reply_id);
+        let reply_id: u128 = rng.random();
+        let reply_addr = &[42; ADDR_LEN];
+        let meta = concat(reply_addr, reply_id.to_be_bytes());
+        let meta = concat(&meta, &[0, 0, 0]);
+        let (secrets, surb) = scylla.create_surb(nodes, meta.as_slice().try_into().unwrap());
         let text = b"Widdewiddewitt";
 
         let mut onion = concat(surb, text);
@@ -619,14 +632,14 @@ pub mod test {
         };
         onion = o;
 
-        let ProcessedOnion::Reply { destination, reply_id: r_id, data } =
+        let ProcessedOnion::Reply { meta, data } =
             scylla.process(&private_keys[3], &onion).unwrap()
         else {
             panic!()
         };
 
-        assert_eq!(destination, [42; KAPPA]);
-        assert_eq!(r_id, reply_id);
+        assert_eq!(&meta[..ADDR_LEN], [42; ADDR_LEN]);
+        assert_eq!(&meta[ADDR_LEN..][..16], reply_id.to_be_bytes());
 
         let payload = scylla.unwrap_reply(&secrets, &data);
         assert_eq!(payload, text);
