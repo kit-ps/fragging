@@ -14,7 +14,7 @@ fn creation(c: &mut Criterion) {
             for &fragment_count in FRAGMENT_COUNTS {
                 let paths = vec![path.clone(); fragment_count];
                 let mut fragments = Vec::new();
-                fragments.push(vec![1u8; payload_size - 3 * 16]);
+                fragments.push(vec![1u8; payload_size - 4 * 16]);
                 for i in 1..fragment_count {
                     fragments.push(vec![i as u8 + 1; payload_size]);
                 }
@@ -23,7 +23,7 @@ fn creation(c: &mut Criterion) {
                     |b| {
                         b.iter(|| {
                             scylla
-                                .create_onions(&paths, &[0; 16], fragments.clone())
+                                .create_onions(&paths, &[0; 32], fragments.clone())
                                 .unwrap()
                         })
                     },
@@ -31,8 +31,9 @@ fn creation(c: &mut Criterion) {
             }
         }
         let scylla = Scylla::new(5, 1024);
+        let surb_meta = &[27; 51];
         c.bench_function(&format!("Scylla::create_surb({length})"), |b| {
-            b.iter(|| scylla.create_surb(&path, &[27; 16], 1337));
+            b.iter(|| scylla.create_surb(&path, surb_meta));
         });
     }
 }
@@ -42,9 +43,9 @@ fn processing(c: &mut Criterion) {
     for &payload_size in PAYLOAD_SIZES {
         let scylla = Scylla::new(5, payload_size as u32);
 
-        let fragments = vec![vec![0u8; payload_size - 3 * 16]];
+        let fragments = vec![vec![0u8; payload_size - 4 * 16]];
         let onion = &scylla
-            .create_onions(&[&[node, node]], &[0; 16], fragments.clone())
+            .create_onions(&[&[node, node]], &[0; 32], fragments.clone())
             .unwrap()[0];
 
         c.bench_function(
@@ -66,7 +67,8 @@ fn processing(c: &mut Criterion) {
             },
         );
 
-        let (_secrets, surb) = scylla.create_surb(&[node], &[1; 16], 4242);
+        let meta = &[1; 51];
+        let (_secrets, surb) = scylla.create_surb(&[node], meta);
         let mut onion = Vec::from(surb);
         onion.extend(vec![2; payload_size]);
 
@@ -92,11 +94,11 @@ fn defrag(c: &mut Criterion) {
         for &fragment_count in FRAGMENT_COUNTS {
             let paths = vec![path.clone(); fragment_count];
             let mut fragments = Vec::new();
-            fragments.push(vec![1u8; payload_size - 3 * 16]);
+            fragments.push(vec![1u8; payload_size - 4 * 16]);
             for i in 1..fragment_count {
                 fragments.push(vec![i as u8 + 1; payload_size]);
             }
-            let onions = scylla.create_onions(&paths, &[4; 16], fragments).unwrap();
+            let onions = scylla.create_onions(&paths, &[4; 32], fragments).unwrap();
             assert_eq!(onions.len(), fragment_count);
             let mut onions = onions
                 .into_iter()
