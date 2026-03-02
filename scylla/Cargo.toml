@@ -15,7 +15,8 @@ thiserror = "2.0.12"
 zears = { version = "0.2.1", features = ["simd"] }
 
 [dev-dependencies]
-criterion = { version = "0.7", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
+criterion-cputime = { path = "../criterion-cputime" }
 
 [[bench]]
 name = "scylla"

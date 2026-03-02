@@ -1,9 +1,12 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, criterion_group, criterion_main};
+use criterion_cputime::CpuTime;
 use scylla::{Scylla, Node, ProcessedOnion};
 
 const PATH_LENGTHS: &[u32] = &[1, 2, 3, 4, 5];
 const PAYLOAD_SIZES: &[usize] = &[128, 256, 512, 1024];
 const FRAGMENT_COUNTS: &[usize] = &[1, 2, 5, 10];
+
+type Criterion<W = CpuTime> = criterion::Criterion<W>;
 
 fn creation(c: &mut Criterion) {
     for &length in PATH_LENGTHS {
@@ -21,11 +24,15 @@ fn creation(c: &mut Criterion) {
                 c.bench_function(
                     &format!("Scylla::create_onions({length}, {payload_size}, {fragment_count})"),
                     |b| {
-                        b.iter(|| {
-                            scylla
-                                .create_onions(&paths, &[0; 32], fragments.clone())
-                                .unwrap()
-                        })
+                        b.iter_batched_ref(
+                            || (),
+                            |_| {
+                                scylla
+                                    .create_onions(&paths, &[0; 32], fragments.clone())
+                                    .unwrap()
+                            },
+                            BatchSize::SmallInput,
+                        )
                     },
                 );
             }
@@ -51,7 +58,11 @@ fn processing(c: &mut Criterion) {
         c.bench_function(
             &format!("Scylla::process(Flag::Relay, {payload_size})"),
             |b| {
-                b.iter(|| scylla.process(&private_key, onion).unwrap());
+                b.iter_batched_ref(
+                    || (),
+                    |_| scylla.process(&private_key, onion).unwrap(),
+                    BatchSize::SmallInput,
+                );
             },
         );
 
@@ -63,7 +74,11 @@ fn processing(c: &mut Criterion) {
         c.bench_function(
             &format!("Scylla::process(Flag::Fragment, {payload_size})"),
             |b| {
-                b.iter(|| scylla.process(&private_key, &onion).unwrap());
+                b.iter_batched_ref(
+                    || (),
+                    |_| scylla.process(&private_key, &onion).unwrap(),
+                    BatchSize::SmallInput,
+                );
             },
         );
 
@@ -80,7 +95,11 @@ fn processing(c: &mut Criterion) {
         c.bench_function(
             &format!("Scylla::process(Flag::Deliver, {payload_size})"),
             |b| {
-                b.iter(|| scylla.process(&private_key, &onion).unwrap());
+                b.iter_batched_ref(
+                    || (),
+                    |_| scylla.process(&private_key, &onion).unwrap(),
+                    BatchSize::SmallInput,
+                );
             },
         );
     }
@@ -116,12 +135,21 @@ fn defrag(c: &mut Criterion) {
             c.bench_function(
                 &format!("Scylla::defrag({payload_size}, {fragment_count})"),
                 |b| {
-                    b.iter(|| scylla.defrag(&onions).unwrap());
+                    b.iter_batched_ref(
+                        || (),
+                        |_| scylla.defrag(&onions).unwrap(),
+                        BatchSize::SmallInput,
+                    );
                 },
             );
         }
     }
 }
 
-criterion_group!(scylla, creation, processing, defrag);
+criterion_group! {
+    name = scylla;
+    config = Criterion::default()
+        .with_measurement(CpuTime);
+    targets = creation, processing, defrag
+}
 criterion_main!(scylla);

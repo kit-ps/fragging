@@ -13,14 +13,6 @@ use rand::{
 use rand_distr::Exp;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-fn rng() -> MutexGuard<'static, StdRng> {
-    static GENERATOR: LazyLock<Mutex<StdRng>> = LazyLock::new(|| {
-        let seed: [u8; 32] = rand::rng().random();
-        Mutex::new(StdRng::from_seed(seed))
-    });
-    GENERATOR.lock().unwrap()
-}
-
 pub type NodeId = u64;
 pub type UserId = u64;
 pub type Timestamp = u64;
@@ -53,15 +45,15 @@ pub struct PendingAck {
 #[derive(Debug, Clone)]
 pub struct Packet {
     pub destination: NodeId,
-    pub arrival_time: Timestamp,
+    pub delay: Timestamp,
     pub content: Content,
 }
 
 impl Packet {
-    pub fn final_arrival(&self) -> Timestamp {
-        match &self.content {
-            Content::Packet(p) => p.final_arrival(),
-            _ => self.arrival_time,
+    pub fn total_delay(&self) -> Timestamp {
+        self.delay + match &self.content {
+            Content::Packet(p) => p.total_delay(),
+            _ => 0,
         }
     }
 
@@ -95,7 +87,7 @@ pub enum Content {
 
 #[derive(Debug, Clone, Default)]
 pub struct Node {
-    pub ingress: Vec<Packet>,
+    pub ingress: Vec<(Timestamp, Packet)>,
 }
 
 impl Node {
@@ -105,19 +97,19 @@ impl Node {
         }
     }
 
-    pub fn insert(&mut self, packet: Packet) {
+    pub fn insert(&mut self, timestamp: Timestamp, packet: Packet) {
         let idx = self
             .ingress
-            .partition_point(|x| x.arrival_time <= packet.arrival_time);
-        self.ingress.insert(idx, packet);
+            .partition_point(|x| x.0 <= timestamp);
+        self.ingress.insert(idx, (timestamp, packet));
     }
 
     pub fn next(&self) -> Option<Timestamp> {
-        self.ingress.first().map(|x| x.arrival_time)
+        self.ingress.first().map(|x| x.0)
     }
 
     pub fn pop(&mut self) -> Option<Packet> {
-        Some(self.ingress.remove(0))
+        Some(self.ingress.remove(0).1)
     }
 }
 
@@ -191,10 +183,12 @@ pub struct Simulation {
     pub first_to_last: Vec<Timestamp>,
     pub next_message_id: u64,
     pub next_fragment_set: u64,
+    pub packet_count: u64,
+    pub rng: StdRng,
 }
 
 impl Simulation {
-    pub fn new(ack_strat: AckStrategy, config: Config) -> Simulation {
+    pub fn new(ack_strat: AckStrategy, config: Config, seed: [u8; 32]) -> Simulation {
         Simulation {
             timestamp: 0,
             ack_strat,
@@ -205,6 +199,8 @@ impl Simulation {
             first_to_last: Default::default(),
             next_message_id: 0,
             next_fragment_set: 0,
+            packet_count: 0,
+            rng: StdRng::from_seed(seed),
         }
     }
 
@@ -266,7 +262,7 @@ impl Simulation {
                     }
                     Content::Packet(pack) => {
                         let node = self.nodes.get_mut(&pack.destination).unwrap();
-                        node.insert(*pack);
+                        node.insert(self.timestamp + pack.delay, *pack);
                     }
                 }
             }
@@ -284,7 +280,8 @@ impl Simulation {
                         user.t_first.entry(m.fragment_set).or_insert(self.timestamp);
                         let ack = m.ack;
                         if self.ack_strat == AckStrategy::PerFragment {
-                            self.nodes.get_mut(&ack.destination).unwrap().insert(*ack.clone());
+                            self.nodes.get_mut(&ack.destination).unwrap().insert(self.timestamp + ack.delay, *ack.clone());
+                            self.packet_count += 1;
                         }
                         user.mark_fragment(m.fragment_set, m.fragment_index);
                         if user.fragment_set_size(m.fragment_set) == m.fragment_size {
@@ -293,7 +290,8 @@ impl Simulation {
                             self.delivery_times.push(delivery_time);
                             self.first_to_last.push(ftl);
                             if self.ack_strat == AckStrategy::WholeMessage {
-                                self.nodes.get_mut(&ack.destination).unwrap().insert(*ack);
+                                self.nodes.get_mut(&ack.destination).unwrap().insert(self.timestamp + ack.delay, *ack);
+                                self.packet_count += 1;
                             }
                         }
                     }
@@ -301,7 +299,7 @@ impl Simulation {
                         let node = self.nodes.get_mut(&packet.destination).unwrap();
                         match self.ack_strat {
                             AckStrategy::PerFragment => {
-                                let total_delay = packet.final_arrival() - self.timestamp;
+                                let total_delay = packet.total_delay();
                                 let timeout = (total_delay as f32 * self.config.ack_multiplier) as u32 + self.config.ack_addition;
                                 let user = self.users.get_mut(&user_id).unwrap();
                                 user.insert(self.timestamp + timeout as u64, UserEvent::AckTimeout(packet.message_id()));
@@ -309,7 +307,7 @@ impl Simulation {
                                 user.original_messages.insert(message.id, message.clone());
                             },
                             AckStrategy::WholeMessage => {
-                                let total_delay = packet.final_arrival() - self.timestamp;
+                                let total_delay = packet.total_delay();
                                 let timeout = (total_delay as f32 * self.config.ack_multiplier) as u32 + self.config.ack_addition;
                                 let message = packet.message();
                                 match user.original_messages.entry(message.fragment_set) {
@@ -321,9 +319,10 @@ impl Simulation {
                                 }
                             },
                         }
-                        if rng().random::<f32>() >= self.users[&user_id].drop_chance {
-                            node.insert(packet);
+                        if self.rng.random::<f32>() >= self.users[&user_id].drop_chance {
+                            node.insert(self.timestamp + packet.delay, packet);
                         }
+                        self.packet_count += 1;
                     }
                     UserEvent::SendMessage(num_frags) => {
                         let packets = self.build_messages(user_id, 1, num_frags);
@@ -348,6 +347,9 @@ impl Simulation {
                             }
                             AckStrategy::WholeMessage => {
                                 let message = user.original_messages.remove(&id).unwrap();
+                                // Clear out the old waiting fragments
+                                self.users.get_mut(&message.recipient).unwrap().fragments.remove(&message.fragment_set);
+
                                 let packets = self.build_messages(message.sender, message.recipient, message.fragment_size);
                                 for mut packet in packets {
                                     packet.message_mut().sending_time = message.sending_time;
@@ -404,41 +406,40 @@ impl Simulation {
         packets
     }
 
-    pub fn build_packet_with_delays(&self, content: Content, mut delays: Vec<Timestamp>) -> Packet {
+    pub fn build_packet_with_delays(&mut self, content: Content, mut delays: Vec<Timestamp>) -> Packet {
         let mut c = content;
         let distr_nodes = Uniform::new(0, self.nodes.keys().max().unwrap_or(&0) + 1).unwrap();
 
         for _ in 0..(self.config.num_hops - 1) {
-            let node = distr_nodes.sample(&mut rng());
-            let total_delay = delays.iter().sum::<Timestamp>();
+            let node = distr_nodes.sample(&mut self.rng);
+            let delay = delays.pop().unwrap();
             let packet = Packet {
                 destination: node,
-                arrival_time: self.timestamp + total_delay,
+                delay,
                 content: c,
             };
             c = Content::Packet(Box::new(packet));
-            delays.pop();
         }
 
-        let node = distr_nodes.sample(&mut rng());
+        let node = distr_nodes.sample(&mut self.rng);
         let delay = delays[0] as Timestamp;
         Packet {
             destination: node,
-            arrival_time: self.timestamp + delay,
+            delay,
             content: c,
         }
     }
 
-    pub fn build_packet(&self, content: Content) -> Packet {
+    pub fn build_packet(&mut self, content: Content) -> Packet {
         let delays = self.draw_delays(self.config.num_hops as usize);
         self.build_packet_with_delays(content, delays)
     }
 
-    pub fn draw_delays(&self, num: usize) -> Vec<Timestamp> {
+    pub fn draw_delays(&mut self, num: usize) -> Vec<Timestamp> {
         let distr_delay = Exp::new(1.0 / (self.config.delay_per_hop as f32)).unwrap();
 
         (0..num)
-            .map(|_| distr_delay.sample(&mut rng()) as Timestamp)
+            .map(|_| distr_delay.sample(&mut self.rng) as Timestamp)
             .collect::<Vec<_>>()
 
     }
@@ -454,24 +455,110 @@ pub struct Config {
 
 fn main() -> Result<()> {
     let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.write_record(["drop_chance", "ack_strat", "dt_avg", "dt_25", "dt_75", "ftl_avg", "ftl_25", "ftl_75"])?;
+    wtr.write_record(["num_frags", "drop_chance", "ack_strat", "dt_avg", "dt_25", "dt_50", "dt_75", "ftl_avg", "ftl_25", "ftl_50", "ftl_75", "packet_count"])?;
 
-    for drop in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9] {
-        for strat in [AckStrategy::PerFragment, AckStrategy::WholeMessage] {
-            let stats = run(strat, drop);
-            wtr.write_record([
-                drop.to_string(),
-                format!("{strat:?}"),
-                stats.dt_avg.to_string(),
-                stats.dt_25.to_string(),
-                stats.dt_75.to_string(),
-                stats.ftl_avg.to_string(),
-                stats.ftl_25.to_string(),
-                stats.ftl_75.to_string(),
-            ])?;
+    let wtr = &Mutex::new(wtr);
+
+    rayon::scope_fifo(|s| {
+        for num_frags in [2, 3, 4, 5, 6, 7, 8] {
+            for drop in [
+                0.00,
+                0.05,
+                0.10,
+                0.15,
+                0.20,
+                0.25,
+                0.30,
+                0.35,
+                0.40,
+                0.45,
+                0.50,
+                0.55,
+                0.60,
+                0.65,
+                0.70,
+                //0.75,
+                //0.80,
+                //0.85,
+                //0.90,
+                //0.95,
+            ] {
+                for strat in [AckStrategy::PerFragment, AckStrategy::WholeMessage] {
+                    s.spawn_fifo(move |_| {
+                        let stats = run(strat, drop, num_frags);
+                        let mut wtr = wtr.lock().unwrap();
+                        wtr.write_record([
+                            num_frags.to_string(),
+                            drop.to_string(),
+                            format!("{strat:?}"),
+                            stats.dt_avg.to_string(),
+                            stats.dt_25.to_string(),
+                            stats.dt_50.to_string(),
+                            stats.dt_75.to_string(),
+                            stats.ftl_avg.to_string(),
+                            stats.ftl_25.to_string(),
+                            stats.ftl_50.to_string(),
+                            stats.ftl_75.to_string(),
+                            stats.packet_count.to_string(),
+                        ]).unwrap();
+                        wtr.flush().unwrap();
+                    });
+                }
+            }
         }
-        wtr.flush()?;
-    }
+
+        for num_frags in [10, 20, 30, 40, 50] {
+            for drop in [0.00, 0.05, 0.10] {
+                for strat in [AckStrategy::PerFragment, AckStrategy::WholeMessage] {
+                    s.spawn_fifo(move |_| {
+                        let stats = run(strat, drop, num_frags);
+                        let mut wtr = wtr.lock().unwrap();
+                        wtr.write_record([
+                            num_frags.to_string(),
+                            drop.to_string(),
+                            format!("{strat:?}"),
+                            stats.dt_avg.to_string(),
+                            stats.dt_25.to_string(),
+                            stats.dt_50.to_string(),
+                            stats.dt_75.to_string(),
+                            stats.ftl_avg.to_string(),
+                            stats.ftl_25.to_string(),
+                            stats.ftl_50.to_string(),
+                            stats.ftl_75.to_string(),
+                            stats.packet_count.to_string(),
+                        ]).unwrap();
+                        wtr.flush().unwrap();
+                    });
+                }
+            }
+        }
+
+        for num_frags in 1..128 {
+            for drop in [0.01, 0.001] {
+                for strat in [AckStrategy::PerFragment, AckStrategy::WholeMessage] {
+                    s.spawn_fifo(move |_| {
+                        let stats = run(strat, drop, num_frags);
+                        let mut wtr = wtr.lock().unwrap();
+                        wtr.write_record([
+                            num_frags.to_string(),
+                            drop.to_string(),
+                            format!("{strat:?}"),
+                            stats.dt_avg.to_string(),
+                            stats.dt_25.to_string(),
+                            stats.dt_50.to_string(),
+                            stats.dt_75.to_string(),
+                            stats.ftl_avg.to_string(),
+                            stats.ftl_25.to_string(),
+                            stats.ftl_50.to_string(),
+                            stats.ftl_75.to_string(),
+                            stats.packet_count.to_string(),
+                        ]).unwrap();
+                        wtr.flush().unwrap();
+                    });
+                }
+            }
+        }
+    });
 
 
     Ok(())
@@ -481,13 +568,16 @@ fn main() -> Result<()> {
 pub struct Stats {
     pub dt_avg: f32,
     pub dt_25: f32,
+    pub dt_50: f32,
     pub dt_75: f32,
     pub ftl_avg: f32,
     pub ftl_25: f32,
+    pub ftl_50: f32,
     pub ftl_75: f32,
+    pub packet_count: u64,
 }
 
-fn run(ack_strat: AckStrategy, drop_chance: f32) -> Stats {
+fn run(ack_strat: AckStrategy, drop_chance: f32, num_frags: u32) -> Stats {
     let config = Config {
         delay_per_hop: 50,
         num_hops: 3,
@@ -495,7 +585,7 @@ fn run(ack_strat: AckStrategy, drop_chance: f32) -> Stats {
         ack_multiplier: 1.5,
     };
 
-    let mut sim = Simulation::new(ack_strat, config);
+    let mut sim = Simulation::new(ack_strat, config, rand::rng().random());
     sim.add_node();
     sim.add_node();
     sim.add_node();
@@ -505,14 +595,10 @@ fn run(ack_strat: AckStrategy, drop_chance: f32) -> Stats {
     sim.add_user();
 
     for _ in 0..1000 {
-        sim.users.get_mut(&0).unwrap().insert(0, UserEvent::SendMessage(8));
+        sim.users.get_mut(&0).unwrap().insert(0, UserEvent::SendMessage(num_frags));
     }
 
-    //while sim.step().is_ok() {}
-
-    loop {
-        sim.step().unwrap()
-    }
+    while sim.step().is_ok() {}
 
     let mut delivery_times: Vec<f32> = sim.delivery_times.into_iter().map(|x| x as f32).collect();
     let mut ftl: Vec<f32> = sim.first_to_last.into_iter().map(|x| x as f32).collect();
@@ -520,10 +606,13 @@ fn run(ack_strat: AckStrategy, drop_chance: f32) -> Stats {
     Stats {
         dt_avg: average(&delivery_times),
         dt_25: quantile(&mut delivery_times, 0.25),
+        dt_50: quantile(&mut delivery_times, 0.50),
         dt_75: quantile(&mut delivery_times, 0.75),
         ftl_avg: average(&ftl),
         ftl_25: quantile(&mut ftl, 0.25),
+        ftl_50: quantile(&mut ftl, 0.50),
         ftl_75: quantile(&mut ftl, 0.75),
+        packet_count: sim.packet_count,
     }
 }
 

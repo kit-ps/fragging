@@ -14,7 +14,8 @@
 
 extern crate sphinx_packet;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main};
+use criterion_cputime::CpuTime;
 use sphinx_packet::constants::{
     DESTINATION_ADDRESS_LENGTH, IDENTIFIER_LENGTH, MAX_PATH_LENGTH, NODE_ADDRESS_LENGTH,
 };
@@ -24,6 +25,8 @@ use sphinx_packet::route::{Destination, DestinationAddressBytes, Node, NodeAddre
 use sphinx_packet::{SURBMaterial, SphinxPacket, SphinxPacketBuilder};
 use std::convert::TryInto;
 use std::time::Duration;
+
+type Criterion<W = CpuTime> = criterion::Criterion<W>;
 
 const PAYLOAD_SIZES: &[usize] = &[128, 256, 512, 1024];
 
@@ -134,6 +137,11 @@ fn bench_surb(c: &mut Criterion) {
     });
 }
 
-criterion_group!(sphinx, bench_new_no_surb, bench_unwrap, bench_surb);
+criterion_group! {
+    name = sphinx;
+    config = Criterion::default()
+        .with_measurement(CpuTime);
+    targets = bench_new_no_surb, bench_unwrap, bench_surb
+}
 
 criterion_main!(sphinx);

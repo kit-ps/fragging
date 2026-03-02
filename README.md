@@ -21,6 +21,16 @@ cd scylla
 cargo bench
 ```
 
+**For Linux:**
+In order to make the measurements more stable, it is advised to set your CPU
+governor to `performance` and pin the benchmark to a specific core:
+
+```bash
+cpupower frequency-set -g performance
+# Instead of cargo bench:
+taskset -c 0 cargo bench
+```
+
 Additionally, we provide an "example" binary which outputs onion sizes as CSV:
 
 ```bash
@@ -43,6 +53,15 @@ We provide a script to easily run benchmarks for different parameters:
 cd sphinx-benchmarks
 # Will take some time:
 ./run.sh
+```
+
+**For Linux:**
+In order to make the measurements more stable, it is advised to set your CPU
+governor to `performance` and pin the benchmark to a specific core:
+
+```bash
+cpupower frequency-set -g performance
+taskset -c 0 ./run.sh
 ```
 
 ## Nym testbed
