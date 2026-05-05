@@ -12,7 +12,12 @@ serde = { version = "1.0.219", features = ["derive"] }
 sha2 = "0.10.9"
 sha3 = "0.10.8"
 thiserror = "2.0.12"
-zears = { version = "0.2.1", features = ["simd"] }
+
+# Use the same primitives as Nym's sphinx:
+lioness = "0.1.2"
+chacha = "0.3.0"
+blake2 = "0.8.0" # cannot be updated due to outdated dependency inside lioness
+hkdf = "0.12.4"
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

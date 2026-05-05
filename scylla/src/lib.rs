@@ -1,10 +1,13 @@
 //! Prototype implementation of Scylla, the mix format with fragmentation.
 use std::io::Write;
 
-use zears::Aez;
+use blake2::VarBlake2b;
+use chacha::ChaCha;
+use lioness::Lioness;
 use curve25519_dalek::{
     EdwardsPoint, Scalar, constants::ED25519_BASEPOINT_TABLE, edwards::CompressedEdwardsY,
 };
+use hkdf::Hkdf;
 use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
@@ -16,8 +19,8 @@ use sha3::{
 use thiserror::Error;
 
 const KAPPA: usize = 16;
+const PI_KEY_SIZE: usize = 192;
 const ALPHA_LEN: usize = 32;
-const AEZ_NONCE: &[u8] = &[0];
 
 // These sizes are adjusted to be compatible with Nym:
 // https://github.com/nymtech/sphinx/blob/develop/src/constants.rs
@@ -215,22 +218,31 @@ fn mu<A: AsRef<[u8]>>(key: &[u8; KAPPA], data: A) -> [u8; KAPPA] {
     hasher.finalize_fixed()[..KAPPA].try_into().unwrap()
 }
 
-fn h_pi(a: &EdwardsPoint) -> [u8; KAPPA] {
-    let mut hasher = Sha256::default();
-    hasher.update(b"h_pi");
-    hasher.update(&a.compress().0);
-    hasher.finalize_fixed()[..KAPPA].try_into().unwrap()
+fn h_pi(a: &EdwardsPoint) -> [u8; PI_KEY_SIZE] {
+    let hkdf = Hkdf::<Sha256>::new(Some(b"h_pi"), &a.compress().0);
+    let mut output = [0u8; PI_KEY_SIZE];
+    hkdf.expand(&[], &mut output).unwrap();
+    output
 }
 
-fn pi(key: [u8; KAPPA], data: &[u8]) -> Vec<u8> {
-    let aez = Aez::new(&key);
-    aez.encrypt(AEZ_NONCE, &[], 0, data)
+fn pi(key: [u8; PI_KEY_SIZE], data: &[u8]) -> Vec<u8> {
+    if data.is_empty() {
+        return Vec::new();
+    }
+    let cipher = Lioness::<VarBlake2b, ChaCha>::new_raw(&key);
+    let mut output = Vec::from(data);
+    cipher.encrypt(&mut output).unwrap();
+    output
 }
 
-fn pi_inv(key: [u8; KAPPA], data: &[u8]) -> Vec<u8> {
-    let aez = Aez::new(&key);
-    // Should never return None
-    aez.decrypt(AEZ_NONCE, &[], 0, data).unwrap()
+fn pi_inv(key: [u8; PI_KEY_SIZE], data: &[u8]) -> Vec<u8> {
+    if data.is_empty() {
+        return Vec::new();
+    }
+    let cipher = Lioness::<VarBlake2b, ChaCha>::new_raw(&key);
+    let mut output = Vec::from(data);
+    cipher.decrypt(&mut output).unwrap();
+    output
 }
 
 #[derive(Debug, Clone)]
@@ -477,7 +489,7 @@ impl Scylla {
         &self,
         path: &[Node],
         meta: &ReplyMeta,
-    ) -> (Vec<[u8; KAPPA]>, Vec<u8>) {
+    ) -> (Vec<[u8; PI_KEY_SIZE]>, Vec<u8>) {
         let mut final_info = [0u8; REPLY_META_LENGTH + 1];
         final_info[0] = Flag::Deliver as u8;
         final_info[1..].copy_from_slice(meta);
@@ -486,7 +498,7 @@ impl Scylla {
         (secrets, surb)
     }
 
-    pub fn unwrap_reply(&self, secrets: &[[u8; KAPPA]], data: &[u8]) -> Vec<u8> {
+    pub fn unwrap_reply(&self, secrets: &[[u8; PI_KEY_SIZE]], data: &[u8]) -> Vec<u8> {
         let mut data = Vec::from(data);
         for secret in secrets.iter().rev() {
             data = pi(*secret, &data);
@@ -607,7 +619,7 @@ pub mod test {
         let meta = concat(reply_addr, reply_id.to_be_bytes());
         let meta = concat(&meta, &[0, 0, 0]);
         let (secrets, surb) = scylla.create_surb(nodes, meta.as_slice().try_into().unwrap());
-        let text = b"Widdewiddewitt";
+        let text = b"Widdewiddewitt und drei macht neune";
 
         let mut onion = concat(surb, text);
 
