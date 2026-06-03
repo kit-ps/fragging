@@ -14,7 +14,7 @@
 
 extern crate sphinx_packet;
 
-use criterion::{black_box, criterion_group, criterion_main};
+use criterion::{BatchSize, black_box, criterion_group, criterion_main};
 use criterion_cputime::CpuTime;
 use sphinx_packet::constants::{
     DESTINATION_ADDRESS_LENGTH, IDENTIFIER_LENGTH, MAX_PATH_LENGTH, NODE_ADDRESS_LENGTH,
@@ -101,14 +101,16 @@ fn bench_unwrap(c: &mut Criterion) {
 
         let node1_sk = &nodes[0].0;
 
-        // technically it's not benching only unwrapping, but also "make_packet_copy"
-        // but it's relatively small
         c.bench_function(&format!("sphinx unwrap ({payload_size})"), |b| {
-            b.iter(|| {
-                make_packet_copy(&packet)
-                    .process(black_box(node1_sk))
-                    .unwrap()
-            })
+            b.iter_batched(
+                || make_packet_copy(&packet),
+                |packet| {
+                    packet
+                        .process(black_box(node1_sk))
+                        .unwrap()
+                },
+                BatchSize::SmallInput,
+            )
         });
     }
 }
