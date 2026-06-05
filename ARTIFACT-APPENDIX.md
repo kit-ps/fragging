@@ -314,7 +314,7 @@ generate the graphs.
 
 #### Experiment 5: ACK-Latency simulations
 
-- Time:
+- Time: 4 compute-hours
 
 This experiment simulates message transmission using the per-fragment
 acknowledgment strategy, and the per-message acknowledgment strategy. You can
@@ -328,6 +328,10 @@ cargo run --release >results.csv
 This will produce a CSV file with the latency results for various parameter
 combinations, which will later be read by the `Benchmarks.ipynb` notebook to
 generate the graphs.
+
+You can use `tail -f results.csv` to see the output of the program as it is
+produced. New lines should appear every now and then while the process is
+running.
 
 #### Experiment helper: Run all experiments
 

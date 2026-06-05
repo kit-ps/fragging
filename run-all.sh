@@ -26,3 +26,9 @@ fi
 
 ./testbed-setup.sh
 time ./testbed-run.sh
+
+(
+    cd latency-sim
+    # Approximately 4 hours
+    time cargo run --release >results.csv
+)
