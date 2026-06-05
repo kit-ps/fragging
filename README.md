@@ -1,5 +1,11 @@
 # Breaking and (Partially) Fixing Onion Routing With Fragmentation 🧩
 
+This repository contains the code we've used to evaluate the Fragging attack
+and Scylla from our PETS 2026 paper.
+
+> [!note]
+> There is a separate `ARTIFACT-APPENDIX.md` file for the PETS artifact review.
+
 Artifacts:
 
 * Our prototype implementation of Scylla.
