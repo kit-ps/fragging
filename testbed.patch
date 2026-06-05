@@ -1,5 +1,5 @@
 diff --git a/.dockerignore b/.dockerignore
-index 09ed129..6427458 100644
+index 09ed12913..64274581b 100644
 --- a/.dockerignore
 +++ b/.dockerignore
 @@ -2,6 +2,6 @@
@@ -11,7 +11,7 @@ index 09ed129..6427458 100644
  dist
  documentation
 diff --git a/.gitignore b/.gitignore
-index 597794c..b6be256 100644
+index 597794c0e..b6be256b5 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -1,6 +1,8 @@
@@ -32,7 +32,7 @@ index 597794c..b6be256 100644
 \ No newline at end of file
 +nym-network-monitor/*.key
 diff --git a/Cargo.lock b/Cargo.lock
-index 135ecf5..d82cd5d 100644
+index 135ecf513..d82cd5d74 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -3618,9 +3618,9 @@ dependencies = [
@@ -107,7 +107,7 @@ index 135ecf5..d82cd5d 100644
  name = "prometheus"
  version = "0.13.4"
 diff --git a/README.md b/README.md
-index 8ebd3b5..8795ee3 100644
+index 8ebd3b590..8795ee35d 100644
 --- a/README.md
 +++ b/README.md
 @@ -1,3 +1,61 @@
@@ -173,7 +173,7 @@ index 8ebd3b5..8795ee3 100644
  Copyright 2020 - Nym Technologies SA <contact@nymtech.net>
  SPDX-License-Identifier: Apache-2.0
 diff --git a/common/client-core/config-types/src/lib.rs b/common/client-core/config-types/src/lib.rs
-index 4eaba83..4a8ff6e 100644
+index 4eaba838d..4a8ff6e41 100644
 --- a/common/client-core/config-types/src/lib.rs
 +++ b/common/client-core/config-types/src/lib.rs
 @@ -15,13 +15,24 @@ pub mod old;
@@ -203,7 +203,7 @@ index 4eaba83..4a8ff6e 100644
  const DEFAULT_TOPOLOGY_RESOLUTION_TIMEOUT: Duration = Duration::from_millis(5_000);
  
 diff --git a/common/client-core/config-types/src/old/v2.rs b/common/client-core/config-types/src/old/v2.rs
-index ff09de3..08fd14a 100644
+index ff09de3f2..08fd14a30 100644
 --- a/common/client-core/config-types/src/old/v2.rs
 +++ b/common/client-core/config-types/src/old/v2.rs
 @@ -18,7 +18,7 @@ pub(crate) const DEFAULT_ACK_WAIT_MULTIPLIER: f64 = 1.5;
@@ -216,7 +216,7 @@ index ff09de3..08fd14a 100644
  pub(crate) const DEFAULT_TOPOLOGY_RESOLUTION_TIMEOUT: Duration = Duration::from_millis(5_000);
  // Set this to a high value for now, so that we don't risk sporadic timeouts that might cause
 diff --git a/common/client-core/config-types/src/old/v3.rs b/common/client-core/config-types/src/old/v3.rs
-index 34d40cf..391289b 100644
+index 34d40cf91..391289b3f 100644
 --- a/common/client-core/config-types/src/old/v3.rs
 +++ b/common/client-core/config-types/src/old/v3.rs
 @@ -17,7 +17,7 @@ const DEFAULT_ACK_WAIT_MULTIPLIER: f64 = 1.5;
@@ -229,7 +229,7 @@ index 34d40cf..391289b 100644
  const DEFAULT_TOPOLOGY_RESOLUTION_TIMEOUT: Duration = Duration::from_millis(5_000);
  // Set this to a high value for now, so that we don't risk sporadic timeouts that might cause
 diff --git a/common/client-core/config-types/src/old/v4.rs b/common/client-core/config-types/src/old/v4.rs
-index d293709..5ffc290 100644
+index d293709c0..5ffc290ba 100644
 --- a/common/client-core/config-types/src/old/v4.rs
 +++ b/common/client-core/config-types/src/old/v4.rs
 @@ -18,7 +18,7 @@ const DEFAULT_ACK_WAIT_MULTIPLIER: f64 = 1.5;
@@ -242,7 +242,7 @@ index d293709..5ffc290 100644
  const DEFAULT_TOPOLOGY_RESOLUTION_TIMEOUT: Duration = Duration::from_millis(5_000);
  const DEFAULT_MAX_STARTUP_GATEWAY_WAITING_PERIOD: Duration = Duration::from_secs(70 * 60); // 70min -> full epoch (1h) + a bit of overhead
 diff --git a/common/client-core/config-types/src/old/v5.rs b/common/client-core/config-types/src/old/v5.rs
-index 0b4dab4..c0d0a4a 100644
+index 0b4dab44c..c0d0a4a13 100644
 --- a/common/client-core/config-types/src/old/v5.rs
 +++ b/common/client-core/config-types/src/old/v5.rs
 @@ -17,7 +17,7 @@ const DEFAULT_ACK_WAIT_MULTIPLIER: f64 = 1.5;
@@ -255,7 +255,7 @@ index 0b4dab4..c0d0a4a 100644
  const DEFAULT_TOPOLOGY_RESOLUTION_TIMEOUT: Duration = Duration::from_millis(5_000);
  const DEFAULT_MAX_STARTUP_GATEWAY_WAITING_PERIOD: Duration = Duration::from_secs(70 * 60); // 70min -> full epoch (1h) + a bit of overhead
 diff --git a/common/client-core/src/client/base_client/mod.rs b/common/client-core/src/client/base_client/mod.rs
-index 646300d..de3f161 100644
+index 646300d5a..de3f16175 100644
 --- a/common/client-core/src/client/base_client/mod.rs
 +++ b/common/client-core/src/client/base_client/mod.rs
 @@ -52,7 +52,7 @@ use nym_sphinx::receiver::{ReconstructedMessage, SphinxMessageReceiver};
@@ -316,7 +316,7 @@ index 646300d..de3f161 100644
          let packet_stats_reporter =
              Self::start_packet_statistics_control(shutdown.fork("packet_statistics_control"));
 diff --git a/common/client-core/src/client/topology_control/mod.rs b/common/client-core/src/client/topology_control/mod.rs
-index bbf32f3..25a468f 100644
+index bbf32f377..25a468f41 100644
 --- a/common/client-core/src/client/topology_control/mod.rs
 +++ b/common/client-core/src/client/topology_control/mod.rs
 @@ -1,13 +1,14 @@
@@ -347,7 +347,7 @@ index bbf32f3..25a468f 100644
              warn!("failed to obtain new network topology");
          }
 diff --git a/common/client-core/src/init/helpers.rs b/common/client-core/src/init/helpers.rs
-index c6d17fc..6ef3401 100644
+index c6d17fc16..6ef340198 100644
 --- a/common/client-core/src/init/helpers.rs
 +++ b/common/client-core/src/init/helpers.rs
 @@ -312,7 +312,6 @@ pub(super) async fn register_with_gateway(
@@ -359,7 +359,7 @@ index c6d17fc..6ef3401 100644
          log::warn!("Failed to establish connection with gateway!");
          ClientCoreError::GatewayClientError {
 diff --git a/common/client-libs/gateway-client/src/client/mod.rs b/common/client-libs/gateway-client/src/client/mod.rs
-index 2278c6f..cfda5cc 100644
+index 2278c6fa4..cfda5ccc3 100644
 --- a/common/client-libs/gateway-client/src/client/mod.rs
 +++ b/common/client-libs/gateway-client/src/client/mod.rs
 @@ -183,6 +183,8 @@ impl<C, St> GatewayClient<C, St> {
@@ -372,7 +372,7 @@ index 2278c6f..cfda5cc 100644
              Ok((ws_stream, _)) => ws_stream,
              Err(error) => {
 diff --git a/common/config/Cargo.toml b/common/config/Cargo.toml
-index 0723f2c..8141244 100644
+index 0723f2c38..8141244bb 100644
 --- a/common/config/Cargo.toml
 +++ b/common/config/Cargo.toml
 @@ -14,8 +14,11 @@ log = { workspace = true }
@@ -389,7 +389,7 @@ index 0723f2c..8141244 100644
  default = ["dirs"]
 diff --git a/common/config/src/environment.rs b/common/config/src/environment.rs
 new file mode 100644
-index 0000000..93204cd
+index 000000000..93204cda5
 --- /dev/null
 +++ b/common/config/src/environment.rs
 @@ -0,0 +1,50 @@
@@ -444,7 +444,7 @@ index 0000000..93204cd
 +    PROJECT_ROOT.clone()
 +}
 diff --git a/common/config/src/lib.rs b/common/config/src/lib.rs
-index 932d751..112c8b8 100644
+index 932d7515a..112c8b879 100644
 --- a/common/config/src/lib.rs
 +++ b/common/config/src/lib.rs
 @@ -16,6 +16,7 @@ pub mod defaults;
@@ -456,7 +456,7 @@ index 932d751..112c8b8 100644
  pub const NYM_DIR: &str = ".nym";
  pub const DEFAULT_NYM_APIS_DIR: &str = "nym-api";
 diff --git a/common/mixnode-common/src/verloc/mod.rs b/common/mixnode-common/src/verloc/mod.rs
-index 6800410..b840800 100644
+index 68004105d..b840800cf 100644
 --- a/common/mixnode-common/src/verloc/mod.rs
 +++ b/common/mixnode-common/src/verloc/mod.rs
 @@ -308,7 +308,8 @@ impl VerlocMeasurer {
@@ -478,7 +478,7 @@ index 6800410..b840800 100644
  }
  
 diff --git a/common/nymsphinx/chunking/src/reconstruction.rs b/common/nymsphinx/chunking/src/reconstruction.rs
-index 13383b2..45996e6 100644
+index 13383b24e..45996e6f1 100644
 --- a/common/nymsphinx/chunking/src/reconstruction.rs
 +++ b/common/nymsphinx/chunking/src/reconstruction.rs
 @@ -4,7 +4,7 @@ use crate::fragment::Fragment;
@@ -503,7 +503,7 @@ index 13383b2..45996e6 100644
  
          let fragment_index = fragment.current_fragment() as usize - 1;
 diff --git a/common/nymsphinx/src/preparer/mod.rs b/common/nymsphinx/src/preparer/mod.rs
-index f7d5e0d..c1612c0 100644
+index f7d5e0d25..c1612c023 100644
 --- a/common/nymsphinx/src/preparer/mod.rs
 +++ b/common/nymsphinx/src/preparer/mod.rs
 @@ -246,6 +246,7 @@ pub trait FragmentPreparer {
@@ -515,7 +515,7 @@ index f7d5e0d..c1612c0 100644
              nym_sphinx_routing::generate_hop_delays(self.average_packet_delay(), route.len());
  
 diff --git a/common/nymsphinx/src/receiver.rs b/common/nymsphinx/src/receiver.rs
-index ac1857f..632971d 100644
+index ac1857fd8..632971df3 100644
 --- a/common/nymsphinx/src/receiver.rs
 +++ b/common/nymsphinx/src/receiver.rs
 @@ -292,6 +292,8 @@ mod message_receiver {
@@ -537,7 +537,7 @@ index ac1857f..632971d 100644
      }
  }
 diff --git a/common/topology/src/lib.rs b/common/topology/src/lib.rs
-index 5630122..4b77047 100644
+index 5630122d0..4b7704716 100644
 --- a/common/topology/src/lib.rs
 +++ b/common/topology/src/lib.rs
 @@ -8,6 +8,7 @@ use crate::filter::VersionFilterable;
@@ -728,7 +728,7 @@ index 5630122..4b77047 100644
              assert!(mixvec.is_empty());
          }
 diff --git a/common/topology/src/serde.rs b/common/topology/src/serde.rs
-index b68dd47..155397a 100644
+index b68dd470b..155397ae7 100644
 --- a/common/topology/src/serde.rs
 +++ b/common/topology/src/serde.rs
 @@ -65,7 +65,7 @@ impl TryFrom<SerializableNymTopology> for NymTopology {
@@ -753,7 +753,7 @@ index b68dd47..155397a 100644
  }
  
 diff --git a/gateway/Cargo.toml b/gateway/Cargo.toml
-index cbdcfc1..0854bcd 100644
+index cbdcfc1ad..0854bcd89 100644
 --- a/gateway/Cargo.toml
 +++ b/gateway/Cargo.toml
 @@ -87,7 +87,7 @@ nym-task = { path = "../common/task" }
@@ -766,7 +766,7 @@ index cbdcfc1..0854bcd 100644
  nym-wireguard-types = { path = "../common/wireguard-types", default-features = false }
  
 diff --git a/gateway/src/node/client_handling/websocket/common_state.rs b/gateway/src/node/client_handling/websocket/common_state.rs
-index 2120b33..2d96aa5 100644
+index 2120b3342..2d96aa5e2 100644
 --- a/gateway/src/node/client_handling/websocket/common_state.rs
 +++ b/gateway/src/node/client_handling/websocket/common_state.rs
 @@ -8,7 +8,8 @@ use std::sync::Arc;
@@ -780,7 +780,7 @@ index 2120b33..2d96aa5 100644
      pub(crate) local_identity: Arc<identity::KeyPair>,
      pub(crate) only_coconut_credentials: bool,
 diff --git a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
-index c15a273..13e6145 100644
+index c15a27302..13e614574 100644
 --- a/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
 +++ b/gateway/src/node/client_handling/websocket/connection_handler/authenticated.rs
 @@ -33,7 +33,7 @@ use thiserror::Error;
@@ -837,7 +837,7 @@ index c15a273..13e6145 100644
          Ok(ServerResponse::Bandwidth { available_total })
      }
 diff --git a/gateway/src/node/mod.rs b/gateway/src/node/mod.rs
-index bf5c3f0..7e15d29 100644
+index bf5c3f0ab..7e15d2900 100644
 --- a/gateway/src/node/mod.rs
 +++ b/gateway/src/node/mod.rs
 @@ -241,7 +241,7 @@ impl<St> Gateway<St> {
@@ -953,7 +953,7 @@ index bf5c3f0..7e15d29 100644
          if self.run_http_server {
              HttpApiBuilder::new(
 diff --git a/mixnode/src/node/mod.rs b/mixnode/src/node/mod.rs
-index 0043113..c2ba0ba 100644
+index 004311365..c2ba0ba43 100644
 --- a/mixnode/src/node/mod.rs
 +++ b/mixnode/src/node/mod.rs
 @@ -233,6 +233,8 @@ impl MixNode {
@@ -985,7 +985,7 @@ index 0043113..c2ba0ba 100644
          info!("Finished nym mixnode startup procedure - it should now be able to receive mix traffic!");
          self.wait_for_interrupt(shutdown).await;
 diff --git a/nym-api/src/network_monitor/test_route/mod.rs b/nym-api/src/network_monitor/test_route/mod.rs
-index 477251f..4a71a39 100644
+index 477251f80..4a71a3991 100644
 --- a/nym-api/src/network_monitor/test_route/mod.rs
 +++ b/nym-api/src/network_monitor/test_route/mod.rs
 @@ -21,17 +21,18 @@ impl TestRoute {
@@ -1011,7 +1011,7 @@ index 477251f..4a71a39 100644
      }
  
 diff --git a/nym-node/Cargo.toml b/nym-node/Cargo.toml
-index 442b62a..78f2ad4 100644
+index 442b62a3b..78f2ad453 100644
 --- a/nym-node/Cargo.toml
 +++ b/nym-node/Cargo.toml
 @@ -61,6 +61,7 @@ nym-gateway = { path = "../gateway" }
@@ -1023,7 +1023,7 @@ index 442b62a..78f2ad4 100644
  [build-dependencies]
  # temporary bonding information v1 (to grab and parse nym-mixnode and nym-gateway package versions)
 diff --git a/nym-node/src/cli/commands/run/mod.rs b/nym-node/src/cli/commands/run/mod.rs
-index 8135e66..2cc7962 100644
+index 8135e66f8..2cc796237 100644
 --- a/nym-node/src/cli/commands/run/mod.rs
 +++ b/nym-node/src/cli/commands/run/mod.rs
 @@ -6,10 +6,13 @@ use crate::node::NymNode;
@@ -1074,7 +1074,7 @@ index 8135e66..2cc7962 100644
          return Ok(());
      }
 diff --git a/sdk/rust/nym-sdk/Cargo.toml b/sdk/rust/nym-sdk/Cargo.toml
-index 8ed4845..f67140b 100644
+index 8ed4845e9..f67140bf6 100644
 --- a/sdk/rust/nym-sdk/Cargo.toml
 +++ b/sdk/rust/nym-sdk/Cargo.toml
 @@ -14,6 +14,7 @@ nym-client-core = { path = "../../../common/client-core", features = [
@@ -1095,7 +1095,7 @@ index 8ed4845..f67140b 100644
  bytes = { workspace = true }
 diff --git a/sdk/rust/nym-sdk/examples/alice.rs b/sdk/rust/nym-sdk/examples/alice.rs
 new file mode 100644
-index 0000000..2fa68a1
+index 000000000..2fa68a168
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/examples/alice.rs
 @@ -0,0 +1,40 @@
@@ -1141,7 +1141,7 @@ index 0000000..2fa68a1
 +}
 diff --git a/sdk/rust/nym-sdk/examples/bob.rs b/sdk/rust/nym-sdk/examples/bob.rs
 new file mode 100644
-index 0000000..7553a07
+index 000000000..7553a0740
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/examples/bob.rs
 @@ -0,0 +1,22 @@
@@ -1169,7 +1169,7 @@ index 0000000..7553a07
 +}
 diff --git a/sdk/rust/nym-sdk/examples/eve.rs b/sdk/rust/nym-sdk/examples/eve.rs
 new file mode 100644
-index 0000000..1ac33c9
+index 000000000..1ac33c904
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/examples/eve.rs
 @@ -0,0 +1,39 @@
@@ -1214,7 +1214,7 @@ index 0000000..1ac33c9
 +}
 diff --git a/sdk/rust/nym-sdk/examples/init_client.rs b/sdk/rust/nym-sdk/examples/init_client.rs
 new file mode 100644
-index 0000000..bc6040d
+index 000000000..bc6040dfd
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/examples/init_client.rs
 @@ -0,0 +1,24 @@
@@ -1243,7 +1243,7 @@ index 0000000..bc6040d
 +}
 +
 diff --git a/sdk/rust/nym-sdk/examples/simple.rs b/sdk/rust/nym-sdk/examples/simple.rs
-index 00ad24d..d020526 100644
+index 00ad24dc9..d020526c2 100644
 --- a/sdk/rust/nym-sdk/examples/simple.rs
 +++ b/sdk/rust/nym-sdk/examples/simple.rs
 @@ -1,9 +1,13 @@
@@ -1285,7 +1285,7 @@ index 00ad24d..d020526 100644
          .on_messages(|msg| println!("Received: {}", String::from_utf8_lossy(&msg.message)))
 diff --git a/sdk/rust/nym-sdk/examples/someone.rs b/sdk/rust/nym-sdk/examples/someone.rs
 new file mode 100644
-index 0000000..4b8cb36
+index 000000000..4b8cb364a
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/examples/someone.rs
 @@ -0,0 +1,28 @@
@@ -1318,7 +1318,7 @@ index 0000000..4b8cb36
 +        .await;
 +}
 diff --git a/sdk/rust/nym-sdk/src/mixnet.rs b/sdk/rust/nym-sdk/src/mixnet.rs
-index 57a17c1..4cd4ac9 100644
+index 57a17c156..4cd4ac948 100644
 --- a/sdk/rust/nym-sdk/src/mixnet.rs
 +++ b/sdk/rust/nym-sdk/src/mixnet.rs
 @@ -37,6 +37,7 @@ mod native_client;
@@ -1330,7 +1330,7 @@ index 57a17c1..4cd4ac9 100644
  pub use client::{DisconnectedMixnetClient, IncludedSurbs, MixnetClientBuilder};
  pub use config::Config;
 diff --git a/sdk/rust/nym-sdk/src/mixnet/client.rs b/sdk/rust/nym-sdk/src/mixnet/client.rs
-index 14138b0..bac41cd 100644
+index 14138b0ba..bac41cdd3 100644
 --- a/sdk/rust/nym-sdk/src/mixnet/client.rs
 +++ b/sdk/rust/nym-sdk/src/mixnet/client.rs
 @@ -39,6 +39,8 @@ use std::path::Path;
@@ -1458,7 +1458,7 @@ index 14138b0..bac41cd 100644
          let nym_address = started_client.address;
 diff --git a/sdk/rust/nym-sdk/src/mixnet/client_util.rs b/sdk/rust/nym-sdk/src/mixnet/client_util.rs
 new file mode 100644
-index 0000000..69f72cb
+index 000000000..69f72cb9a
 --- /dev/null
 +++ b/sdk/rust/nym-sdk/src/mixnet/client_util.rs
 @@ -0,0 +1,78 @@
@@ -1542,7 +1542,7 @@ index 0000000..69f72cb
 +}
 diff --git a/shadow/init.sh b/shadow/init.sh
 new file mode 100644
-index 0000000..fab003d
+index 000000000..fab003db3
 --- /dev/null
 +++ b/shadow/init.sh
 @@ -0,0 +1,14 @@
@@ -1562,7 +1562,7 @@ index 0000000..fab003d
 +sh runsend.sh
 diff --git a/shadow/runmany.sh b/shadow/runmany.sh
 new file mode 100755
-index 0000000..0451336
+index 000000000..04513368d
 --- /dev/null
 +++ b/shadow/runmany.sh
 @@ -0,0 +1,20 @@
@@ -1588,7 +1588,7 @@ index 0000000..0451336
 +done
 diff --git a/shadow/runsend.sh b/shadow/runsend.sh
 new file mode 100755
-index 0000000..fa0d82b
+index 000000000..fa0d82b9c
 --- /dev/null
 +++ b/shadow/runsend.sh
 @@ -0,0 +1,7 @@
@@ -1601,18 +1601,22 @@ index 0000000..fa0d82b
 +
 diff --git a/shadow/runshadow.sh b/shadow/runshadow.sh
 new file mode 100644
-index 0000000..45e731d
+index 000000000..65dcf9375
 --- /dev/null
 +++ b/shadow/runshadow.sh
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,9 @@
 +#!/bin/bash
++# Make sure we pass RUSTUP_HOME and CARGO_HOME if necessary (useful for Docker,
++# where rustup lives in /usr/local)
++[ -v RUSTUP_HOME ] && sed -i "s/RUSTUP_HOME: .*$/RUSTUP_HOME: '$RUSTUP_HOME'/" shadow.yaml
++[ -v CARGO_HOME ] && sed -i "s/CARGO_HOME: .*$/CARGO_HOME: '$CARGO_HOME'/" shadow.yaml
 +# The shadow.data directory must be deleted after every simulation
 +rm -rf shadow.data 
 +# Run the simulation with the given configuration file and write the output to shadow.log
 +shadow shadow.yaml > shadow.log
 diff --git a/shadow/runtests.sh b/shadow/runtests.sh
 new file mode 100644
-index 0000000..0164065
+index 000000000..016406505
 --- /dev/null
 +++ b/shadow/runtests.sh
 @@ -0,0 +1,9 @@
@@ -1627,10 +1631,10 @@ index 0000000..0164065
 +
 diff --git a/shadow/shadow.yaml b/shadow/shadow.yaml
 new file mode 100644
-index 0000000..41eb15b
+index 000000000..08bd202cd
 --- /dev/null
 +++ b/shadow/shadow.yaml
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,125 @@
 +general:
 +  stop_time: 40s
 +  model_unblocked_syscall_latency: true
@@ -1720,6 +1724,8 @@ index 0000000..41eb15b
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        RUSTUP_HOME: ""
++        CARGO_HOME: ""
 +  someone:
 +    network_node_id: 0
 +    processes:
@@ -1729,6 +1735,8 @@ index 0000000..41eb15b
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        RUSTUP_HOME: ""
++        CARGO_HOME: ""
 +  bob:
 +    network_node_id: 0
 +    processes:
@@ -1738,6 +1746,8 @@ index 0000000..41eb15b
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        RUSTUP_HOME: ""
++        CARGO_HOME: ""
 +  eve:
 +    network_node_id: 0
 +    processes:
@@ -1747,10 +1757,12 @@ index 0000000..41eb15b
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
++        RUSTUP_HOME: ""
++        CARGO_HOME: ""
 +
 diff --git a/shadow/timestamps.py b/shadow/timestamps.py
 new file mode 100644
-index 0000000..34be0d8
+index 000000000..34be0d8bc
 --- /dev/null
 +++ b/shadow/timestamps.py
 @@ -0,0 +1,64 @@
