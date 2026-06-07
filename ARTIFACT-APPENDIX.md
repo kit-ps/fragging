@@ -244,7 +244,7 @@ List each experiment to execute to reproduce your results. Describe:
 > the end of this section.
 
 #### Experiment 1: Nym testbed
-- Time: replace with estimate in human-minutes/hours + compute-minutes/hours.
+- Time: 24 compute-hours
 - Storage: replace with estimate for disk space used (omit if <10GB).
 
 This experiment runs a local Nym testbed (isolated from the live network) to

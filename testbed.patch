@@ -1601,15 +1601,15 @@ index 000000000..fa0d82b9c
 +
 diff --git a/shadow/runshadow.sh b/shadow/runshadow.sh
 new file mode 100644
-index 000000000..65dcf9375
+index 000000000..a9bdc7575
 --- /dev/null
 +++ b/shadow/runshadow.sh
 @@ -0,0 +1,9 @@
 +#!/bin/bash
 +# Make sure we pass RUSTUP_HOME and CARGO_HOME if necessary (useful for Docker,
 +# where rustup lives in /usr/local)
-+[ -v RUSTUP_HOME ] && sed -i "s/RUSTUP_HOME: .*$/RUSTUP_HOME: '$RUSTUP_HOME'/" shadow.yaml
-+[ -v CARGO_HOME ] && sed -i "s/CARGO_HOME: .*$/CARGO_HOME: '$CARGO_HOME'/" shadow.yaml
++[ -v RUSTUP_HOME ] && sed -i "s~RUSTUP_HOME: .*~RUSTUP_HOME: '$RUSTUP_HOME'~" shadow.yaml
++[ -v CARGO_HOME ] && sed -i "s~CARGO_HOME: .*$~CARGO_HOME: '$CARGO_HOME'~" shadow.yaml
 +# The shadow.data directory must be deleted after every simulation
 +rm -rf shadow.data 
 +# Run the simulation with the given configuration file and write the output to shadow.log
