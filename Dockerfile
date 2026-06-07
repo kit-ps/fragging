@@ -24,7 +24,7 @@ RUN mkdir /root/src &&\
     cd /root/src &&\
     git clone https://github.com/shadow/shadow.git &&\
     cd shadow &&\
-    git checkout 8442689a2 &&\
+    git checkout b814c58bef5488038a4566617aaca20c2549f67c &&\
     ./setup build --clean &&\
     ./setup install
 
