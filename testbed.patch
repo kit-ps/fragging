@@ -1601,19 +1601,15 @@ index 000000000..fa0d82b9c
 +
 diff --git a/shadow/runshadow.sh b/shadow/runshadow.sh
 new file mode 100644
-index 000000000..833b91254
+index 000000000..fd81ea5a4
 --- /dev/null
 +++ b/shadow/runshadow.sh
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,5 @@
 +#!/bin/bash
-+# Make sure we pass RUSTUP_HOME and CARGO_HOME if necessary (useful for Docker,
-+# where rustup lives in /usr/local)
-+[ -v RUSTUP_HOME ] && sed -i "s~RUSTUP_HOME: .*~RUSTUP_HOME: '$RUSTUP_HOME'~" shadow.yaml
-+[ -v CARGO_HOME ] && sed -i "s~CARGO_HOME: .*$~CARGO_HOME: '$CARGO_HOME'~" shadow.yaml
 +# The shadow.data directory must be deleted after every simulation
 +rm -rf shadow.data 
 +# Run the simulation with the given configuration file and write the output to shadow.log
-+shadow --native-preemption-enabled=true shadow.yaml > shadow.log
++shadow --progress=true --native-preemption-enabled=true shadow.yaml > shadow.log
 diff --git a/shadow/runtests.sh b/shadow/runtests.sh
 new file mode 100644
 index 000000000..016406505
@@ -1631,10 +1627,10 @@ index 000000000..016406505
 +
 diff --git a/shadow/shadow.yaml b/shadow/shadow.yaml
 new file mode 100644
-index 000000000..08bd202cd
+index 000000000..ceafb73b8
 --- /dev/null
 +++ b/shadow/shadow.yaml
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,113 @@
 +general:
 +  stop_time: 40s
 +  model_unblocked_syscall_latency: true
@@ -1718,47 +1714,35 @@ index 000000000..08bd202cd
 +  alice:
 +    network_node_id: 0
 +    processes:
-+    - path: cargo
-+      args: run --example alice --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++    - path: ../target/debug/examples/alice
 +      start_time: 11s
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        RUSTUP_HOME: ""
-+        CARGO_HOME: ""
 +  someone:
 +    network_node_id: 0
 +    processes:
-+    - path: cargo
-+      args: run --example someone --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++    - path: ../target/debug/examples/someone
 +      start_time: 12s
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        RUSTUP_HOME: ""
-+        CARGO_HOME: ""
 +  bob:
 +    network_node_id: 0
 +    processes:
-+    - path: cargo
-+      args: run --example bob --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++    - path: ../target/debug/examples/bob
 +      start_time: 10s
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        RUSTUP_HOME: ""
-+        CARGO_HOME: ""
 +  eve:
 +    network_node_id: 0
 +    processes:
-+    - path: cargo
-+      args: run --example eve --manifest-path ../../../../sdk/rust/nym-sdk/Cargo.toml
++    - path: ../target/debug/examples/eve
 +      start_time: 13s
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        RUSTUP_HOME: ""
-+        CARGO_HOME: ""
 +
 diff --git a/shadow/timestamps.py b/shadow/timestamps.py
 new file mode 100644
