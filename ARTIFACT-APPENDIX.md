@@ -59,49 +59,14 @@ We have used a system with the following specification:
 * 16 GiB of RAM
 * ~10 GiB of used disk space (mostly compiled Rust crates)
 
-### Software Requirements (Required for Functional and Reproduced badges)
-
-Replace this with the software required to run your artifact and its versions,
-as follows.
-
-1. List the OS you used to run your artifact, along with its version (e.g.,
-   Ubuntu 22.04). If your artifact can only run on a specific OS or a specific
-   OS version, list it and explain why here. In general, your artifact reviewers
-   will probably have access to a machine with a different OS or different OS
-   version than yours; they should still be able to run appropriately packaged
-   artifacts.
-2. List the OS packages that your artifact requires, along with their versions.
-3. Artifact packaging: If you use a container runtime (e.g., Docker) to run the
-   artifact, list the container runtime and its version (e.g., Docker 23.0.3).
-   If you use VMs, list the hypervisor (e.g., VirtualBox) to run the artifact.
-4. List the programming language compiler or interpreter you used to run your
-   artifact (e.g., Python 3.13.7). Your Docker image or VM image should have
-   this version of the programming languages installed already. Your Dockerfile
-   should start from a base image with this programming language version.
-5. List packages that your artifact depends on, along with their versions. For
-   example, Python-based privacy-preserving machine learning artifacts typically
-   require `numpy`, `scipy`, etc. You may point to a file in your artifact with
-   this list, such as a `requirements.txt` file. If you rely on proprietary
-   software (e.g. Matlab R2025a), list this here and consider providing access
-   to reviewers through HotCRP.
-6. List any Machine Learning Models required to run your artifact, along with
-   their versions. If your model is hosted on a different repository, such as on
-   Zenodo, then your artifact should download it automatically (same for
-   datasets). If a required ML model is _not_ in your artifact, provide a dummy
-   model to demonstrate the functionality of the rest of your artifact.
-7. List any datasets required to run your artifact. If any required dataset is
-   not in your artifact, you should provide a synthetic dataset that showcases
-   the expected data format.
-
-If you run our artifact directly on the host, you need the following software
-(or compatible versions):
+### Software Requirements
 
 * Fedora Linux 44
 * Git 2.54.0 (via `git`)
 * Rust 1.97.0-nightly (9ec5d5f32 2026-04-21) (via `rustup`)
 * Python 3.14.5 (via `python3`)
   * Python packages are listed in `requirements.txt`
-* Shadow (https://github.com/shadow/shadow, commit 8442689a2)
+* Shadow (https://github.com/shadow/shadow, commit b814c58bef5488038a4566617aaca20c2549f67c)
   * Shadow comes with its own set of dependencies: https://shadow.github.io/docs/guide/install_dependencies.html
 
 We do provide a `Dockerfile` to build a container with the correct software
@@ -156,31 +121,26 @@ virtualenv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-### Testing the Environment (Required for Functional and Reproduced badges)
+### Testing the Environment
 
-Replace the following by a description of the basic functionality tests to check
-if the environment is set up correctly. These tests could be unit tests,
-training an ML model on very low training data, etc. If these tests succeed, all
-required software should be functioning correctly. Use code segments to simplify
-the workflow, e.g.,
-
-Launch the Docker container, attach the current working directory (i.e., run
-from the root of the cloned git repository) as a volume, set the context to be
-that volume, and provide an interactive bash terminal:
+Launch the Docker container:
 
 ```bash
-docker run --rm -it -v ${PWD}:/workspaces/example-docker-python-pip \
-    -w /workspaces/example-docker-python-pip \
-    --entrypoint bash example-docker-python-pip:main
+docker run --rm -ti -v "$(pwd):/fragging" -p 8888:8888 fragging
 ```
 
-Then within the Docker container, run:
+Within the container (or on the host, if you prefer the non-containerized
+setup), check whether the Rust toolchain works:
 
 ```bash
-./test.sh
+( cd scylla && cargo test )
 ```
 
-Include the expected output.
+Make sure that `shadow` is installed:
+
+```bash
+shadow -V
+```
 
 ## Artifact Evaluation (Required for Functional and Reproduced badges)
 
