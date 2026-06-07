@@ -265,6 +265,10 @@ clients.
 Those files are later used by the `Benchmarks.ipynb` notebook to generate
 Figure 2.
 
+The command prints the progress for each single simulation. You can check the
+overall progress by seeing which files already exist in `nym/shadow/outputs` --
+there will be 1800 files in the end.
+
 #### Experiment 2: Scylla benchmarks
 
 - Time: 30 compute-minutes

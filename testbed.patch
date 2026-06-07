@@ -1746,10 +1746,10 @@ index 000000000..ceafb73b8
 +
 diff --git a/shadow/timestamps.py b/shadow/timestamps.py
 new file mode 100644
-index 000000000..34be0d8bc
+index 000000000..d36878a68
 --- /dev/null
 +++ b/shadow/timestamps.py
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,61 @@
 +"""Fragging timestamp evaluation for the Nym testbed.
 +
 +This script evaluates the timings after which fragment sets have been
@@ -1763,10 +1763,7 @@ index 000000000..34be0d8bc
 +
 +
 +def read_timestamps(threshold):
-+    p = Path("./shadow.data/hosts/bob/cargo.1000.stdout")
-+    if not p.exists():
-+        # Can happen when installing Rust via rustup
-+        p = Path("./shadow.data/hosts/bob/rustup.1000.stdout")
++    p = Path("./shadow.data/hosts/bob/bob.1000.stdout")
 +
 +    with open(p) as file:
 +        set_map = {}
