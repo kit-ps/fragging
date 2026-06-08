@@ -17,7 +17,8 @@ RUN apt update &&\
         xz-utils \
         util-linux \
         gcc \
-        g++
+        g++ \
+        texlive dvipng texlive-latex-extra texlive-fonts-recommended cm-super
 
 
 RUN mkdir /root/src &&\

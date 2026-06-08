@@ -48,6 +48,8 @@ We have used a system with the following specification:
   * Python packages are listed in `requirements.txt`
 * Shadow (https://github.com/shadow/shadow, commit b814c58bef5488038a4566617aaca20c2549f67c)
   * Shadow comes with its own set of dependencies: https://shadow.github.io/docs/guide/install_dependencies.html
+* TeX Live (https://tug.org/texlive) version 2026 (via `tlmgr`)
+  * only used for matplotlib graph generation, can be skipped if LaTeX labels are not needed
 
 We do provide a `Dockerfile` to build a container with the correct software
 installed. In this case, your host only needs Docker (or a compatible runtime
@@ -91,7 +93,8 @@ notebook later:
 docker run --rm -ti -v "$(pwd):/fragging" -p 8888:8888 fragging
 ```
 
-Then set up a Python virtual environment for the graph generation:
+Then, inside the container, set up a Python virtual environment for the graph
+generation:
 
 ```bash
 virtualenv .venv
@@ -295,6 +298,13 @@ In order to generate the graphs, after running all experiments you can use the
 
 ```bash
 .venv/bin/jupyter notebook Benchmarks.ipynb
+```
+
+If you run jupyter inside the container, make sure to use `--allow-root` and
+`--ip=0.0.0.0`:
+
+```bash
+.venv/bin/jupyter notebook --allow-root --ip=0.0.0.0 Benchmarks.ipynb
 ```
 
 Then, click `Run -> Run All Cells`. This will generate the graphs in the
