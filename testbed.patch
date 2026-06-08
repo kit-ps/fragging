@@ -1562,10 +1562,10 @@ index 000000000..fab003db3
 +sh runsend.sh
 diff --git a/shadow/runmany.sh b/shadow/runmany.sh
 new file mode 100755
-index 000000000..04513368d
+index 000000000..bfd027d23
 --- /dev/null
 +++ b/shadow/runmany.sh
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,25 @@
 +#!/bin/bash
 +set -euo pipefail
 +
@@ -1578,11 +1578,16 @@ index 000000000..04513368d
 +        for seed in 1 2 3 4 5
 +        do
 +            echo "Delay $delay -- Chance $chance -- Seed $seed"
++            outfile=outputs/delay_"$delay"_chance_"$chance"_seed_"$seed".txt
++            if [ -e "$outfile" ] ; then
++                echo "Skipping (already exists!)"
++                continue
++            fi
 +            sed -i "s/seed: ./seed: $seed/" shadow.yaml
 +            sed -i "s/FRAGGING_DROP_CHANCE: .*$/FRAGGING_DROP_CHANCE: '$chance'/" shadow.yaml
 +            bash init.sh
 +            bash runshadow.sh || true
-+            python timestamps.py 1000 2>&1 >outputs/delay_"$delay"_chance_"$chance"_seed_"$seed".txt
++            python timestamps.py 1000 2>&1 >"$outfile"
 +        done
 +    done
 +done
@@ -1601,7 +1606,7 @@ index 000000000..fa0d82b9c
 +
 diff --git a/shadow/runshadow.sh b/shadow/runshadow.sh
 new file mode 100644
-index 000000000..fd81ea5a4
+index 000000000..5ecd7919d
 --- /dev/null
 +++ b/shadow/runshadow.sh
 @@ -0,0 +1,5 @@
@@ -1609,7 +1614,7 @@ index 000000000..fd81ea5a4
 +# The shadow.data directory must be deleted after every simulation
 +rm -rf shadow.data 
 +# Run the simulation with the given configuration file and write the output to shadow.log
-+shadow --progress=true --native-preemption-enabled=true shadow.yaml > shadow.log
++shadow --progress=true shadow.yaml > shadow.log
 diff --git a/shadow/runtests.sh b/shadow/runtests.sh
 new file mode 100644
 index 000000000..016406505
