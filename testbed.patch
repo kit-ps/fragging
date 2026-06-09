@@ -1632,7 +1632,7 @@ index 000000000..016406505
 +
 diff --git a/shadow/shadow.yaml b/shadow/shadow.yaml
 new file mode 100644
-index 000000000..ceafb73b8
+index 000000000..dcfdfbdb8
 --- /dev/null
 +++ b/shadow/shadow.yaml
 @@ -0,0 +1,113 @@
@@ -1640,7 +1640,7 @@ index 000000000..ceafb73b8
 +  stop_time: 40s
 +  model_unblocked_syscall_latency: true
 +  log_level: debug
-+  seed: 5
++  seed: 1
 +
 +network:
 +  graph:
@@ -1704,7 +1704,7 @@ index 000000000..ceafb73b8
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        FRAGGING_DROP_CHANCE: '0.9'
++        FRAGGING_DROP_CHANCE: '0.1'
 +  gateway2:
 +    network_node_id: 0
 +    ip_addr: "139.162.247.98"
@@ -1715,7 +1715,7 @@ index 000000000..ceafb73b8
 +      expected_final_state: running
 +      environment:
 +        RUST_LOG: debug
-+        FRAGGING_DROP_CHANCE: '0.9'
++        FRAGGING_DROP_CHANCE: '0.1'
 +  alice:
 +    network_node_id: 0
 +    processes:
@@ -1751,10 +1751,10 @@ index 000000000..ceafb73b8
 +
 diff --git a/shadow/timestamps.py b/shadow/timestamps.py
 new file mode 100644
-index 000000000..d36878a68
+index 000000000..1e3cd71df
 --- /dev/null
 +++ b/shadow/timestamps.py
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +"""Fragging timestamp evaluation for the Nym testbed.
 +
 +This script evaluates the timings after which fragment sets have been
@@ -1773,6 +1773,7 @@ index 000000000..d36878a68
 +    with open(p) as file:
 +        set_map = {}
 +        frag_to_sender = {}
++        last_complete = None
 +
 +        for line in file:
 +            if line.startswith("Insert"):
@@ -1789,6 +1790,8 @@ index 000000000..d36878a68
 +                else:
 +                    info = set_map[frag_set]
 +                    set_map[frag_set] = (info[0], info[1] | {frag_idx}, max(timestamp, info[2]), total_frags)
++                if len(set_map[frag_set][1]) == set_map[frag_set][3]:
++                    last_complete = frag_set
 +            elif line.startswith("Received:"):
 +                if "its someone" in line:
 +                    sender = "someone"
@@ -1796,7 +1799,7 @@ index 000000000..d36878a68
 +                    sender = "eve"
 +                elif "(from alice)" in line:
 +                    sender = "alice"
-+                frag_to_sender[frag_set] = sender
++                frag_to_sender[last_complete] = sender
 +
 +        for frag_set, info in set_map.items():
 +            if len(info[1]) == info[3]:
