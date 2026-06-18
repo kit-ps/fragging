@@ -101,3 +101,10 @@ automatically read the results from the benchmarks/the testbed:
 jupyter notebook Benchmarks.ipynb
 # Run -> Run All Cells
 ```
+
+# License
+
+The code in `sphinx-benchmarks` is taken from
+[Nym](https://github.com/nymtech/sphinx) and has its original license retained.
+
+The remaining code is under the MIT license (see `LICENSE`).
