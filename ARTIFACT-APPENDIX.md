@@ -193,6 +193,11 @@ To run the experiment, use the following commands:
 ./testbed-run.sh
 ```
 
+> [!note]
+> The `testbed-setup.sh` command will fail if the `nym` folder already exists
+> (e.g. if you run the experiment for the second time). In this case, skip this
+> script. Alternatively, remove the `nym` folder to get a clean rebuild.
+
 This will produce text files in `nym/shadow/outputs/` for the various
 combinations of average delay, fragment drop chance, and random seed. Each text
 file contains the set completion time for one experiment run for the three test
