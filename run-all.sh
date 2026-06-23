@@ -24,7 +24,7 @@ fi
     time $TASKSET ./run.sh
 )
 
-./testbed-setup.sh
+[ -e nym/ ] || ./testbed-setup.sh
 time ./testbed-run.sh
 
 (
