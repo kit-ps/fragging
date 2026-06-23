@@ -210,9 +210,9 @@ The command prints the progress for each single simulation. You can check the
 overall progress by seeing which files already exist in `nym/shadow/outputs` --
 there will be 1800 files in the end.
 
-#### Experiment 2: Scylla benchmarks
+#### Experiment 2: Scylla & Sphinx benchmarks
 
-- Time: 5 human-minutes & 30 compute-minutes
+- Time: 5 human-minutes & 45 compute-minutes
 
 This experiment runs the benchmarks for our proof-of-concept implementation of
 Scylla. You can run it via the following command:
@@ -220,12 +220,27 @@ Scylla. You can run it via the following command:
 ```bash
 cd scylla
 cargo bench
+cd ..
 ```
 
 This will produce the benchmark times in `scylla/target/criterion`, which will
 later be used by the `Benchmarks.ipynb` notebook to generate the graphs.
 
-#### Experiment 3: Scylla packet sizes
+Additionally, for our baseline, we run the Sphinx benchmarks based on the
+Sphinx implementation by the Nym project. You can run them via the following
+command:
+
+```bash
+cd sphinx-benchmarks
+./run.sh
+cd ..
+```
+
+This generates the benchmark times in `sphinx-benchmarks/target/criterion`.
+These results will be read by the `Benchmarks.ipynb` notebook to generate the
+graphs.
+
+#### Experiment 3: Scylla & Sphinx packet sizes
 
 - Time: 5 human-minutes & 5 compute-minutes
 
@@ -235,29 +250,24 @@ You can run it via the following command:
 ```bash
 cd scylla
 cargo run --release --example=onion_sizes >onion_sizes.csv
+cd ..
 ```
 
-This generates the `onion_sizes.csv`, which contains the packet sizes. It will
-later be used by the `Benchmarks.ipynb` notebook to generate the graphs.
-
-#### Experiment 4: Sphinx benchmarks
-
-- Time: 5 human-minutes & 15 compute-minutes
-
-This experiment runs the Sphinx benchmarks, based on the Sphinx implementation
-by the Nym project. You can run it via the following command:
+Additionally, generate the Sphinx onion sizes via the following:
 
 ```bash
 cd sphinx-benchmarks
-./run.sh
+./gen-onion-sizes.sh
+cd ..
 ```
 
-This generates the benchmark times in `sphinx-benchmarks/target/criterion`, as
-well as the `sphinx-benchmarks/sphinx_onion_sizes.csv` file with the Sphinx
-onion sizes. Both results will be read by the `Benchmarks.ipynb` notebook to
-generate the graphs.
 
-#### Experiment 5: ACK-Latency simulations
+This generates the `scylla/onion_sizes.csv` and
+`sphinx-benchmarks/sphinx_onion_sizes.csv`, which contain the packet sizes.
+They will later be used by the `Benchmarks.ipynb` notebook to generate the
+graphs.
+
+#### Experiment 4: ACK-Latency simulations
 
 - Time: 5 human-minutes & 4 compute-hours
 

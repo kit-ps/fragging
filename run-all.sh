@@ -22,6 +22,7 @@ fi
     cd sphinx-benchmarks
     # Approximately 15 minutes
     time $TASKSET ./run.sh
+    ./gen-onion-sizes.sh
 )
 
 [ -e nym/ ] || ./testbed-setup.sh
