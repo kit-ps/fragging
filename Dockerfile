@@ -31,4 +31,13 @@ RUN mkdir /root/src &&\
 
 RUN echo 'export PATH="/root/.local/bin:$PATH"' >>/root/.bashrc
 
+RUN mkdir /fragging && chmod 777 /fragging
+
+COPY criterion-cputime /fragging/criterion-cputime
+COPY graphs /fragging/graphs
+COPY latency-sim /fragging/latency-sim
+COPY scylla /fragging/scylla
+COPY sphinx-benchmarks /fragging/sphinx-benchmarks
+COPY Benchmarks.ipynb requirements.txt run-all.sh testbed-run.sh testbed-setup.sh testbed.patch /fragging/
+
 WORKDIR /fragging
