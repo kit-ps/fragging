@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # Optionally: If cpupower is available, change the scaling governor
-cpupower frequency-set -g performance || true
+echo "Trying to set CPU frequency governor to performance."
+echo "This is optional, and might fail:"
+cpupower frequency-set -g performance || echo "CPU governor not changed."
 
 # If taskset is available, use it
 if taskset --help >/dev/null ; then
